@@ -26,6 +26,16 @@ export async function GET(
     const imageBuffer = fs.readFileSync(imagePath);
     const base64Image = `data:image/png;base64,${imageBuffer.toString('base64')}`;
 
+    // Calculate font size based on location name length
+    const getFontSize = (name: string) => {
+      if (name.length > 60) return 40;
+      if (name.length > 45) return 48;
+      if (name.length > 30) return 56;
+      return 64;
+    };
+
+    const fontSize = getFontSize(locationName);
+
     return new ImageResponse(
       (
         <div
@@ -48,28 +58,26 @@ export async function GET(
             }}
           />
 
-          {/* Location Name - Top Left with semi-transparent background */}
+          {/* Location Name - Top Left with strong text shadow, no background */}
           <div
             style={{
               position: 'absolute',
               top: 60,
               left: 60,
+              right: 60,
               display: 'flex',
               flexDirection: 'column',
-              gap: '12px',
-              maxWidth: '1000px',
+              gap: '16px',
             }}
           >
             <div
               style={{
-                fontSize: 64,
+                fontSize: fontSize,
                 fontWeight: 'bold',
                 color: 'white',
-                lineHeight: 1.2,
-                textShadow: '0 4px 12px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3)',
-                background: 'linear-gradient(90deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0))',
-                padding: '12px 24px',
-                borderRadius: '8px',
+                lineHeight: 1.3,
+                textShadow: '0 6px 20px rgba(0, 0, 0, 0.9), 0 3px 8px rgba(0, 0, 0, 0.8), 0 1px 3px rgba(0, 0, 0, 0.6)',
+                display: 'flex',
               }}
             >
               {locationName}
@@ -79,10 +87,8 @@ export async function GET(
                 fontSize: 28,
                 color: 'rgba(255, 255, 255, 0.95)',
                 fontWeight: '500',
-                textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)',
-                background: 'linear-gradient(90deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0))',
-                padding: '8px 24px',
-                borderRadius: '6px',
+                textShadow: '0 4px 12px rgba(0, 0, 0, 0.9), 0 2px 6px rgba(0, 0, 0, 0.7)',
+                display: 'flex',
               }}
             >
               Historical Research
