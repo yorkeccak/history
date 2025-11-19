@@ -33,8 +33,8 @@ export function validatePaymentEnvironment(): EnvValidationResult {
     if (!process.env.POLAR_WEBHOOK_SECRET) {
       errors.push('POLAR_WEBHOOK_SECRET is required in production');
     }
-    if (!process.env.POLAR_UNLIMITED_PRODUCT_ID) {
-      errors.push('POLAR_UNLIMITED_PRODUCT_ID is required in production');
+    if (!process.env.POLAR_SUBSCRIPTION_PRODUCT_ID) {
+      errors.push('POLAR_SUBSCRIPTION_PRODUCT_ID is required in production');
     }
     if (!process.env.POLAR_PAY_PER_USE_PRODUCT_ID) {
       errors.push('POLAR_PAY_PER_USE_PRODUCT_ID is required in production');

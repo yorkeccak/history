@@ -92,7 +92,7 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-blue-600 dark:bg-blue-700 rounded-lg">
-                    {subscription.tier === 'unlimited' ? (
+                    {subscription.tier === 'subscription' ? (
                       <Crown className="h-6 w-6 text-white" />
                     ) : (
                       <Zap className="h-6 w-6 text-white" />
@@ -100,7 +100,7 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                      {subscription.tier === 'unlimited' ? 'Pro Unlimited' : 'Pay-As-You-Go'}
+                      {subscription.tier === 'subscription' ? 'Subscription' : 'Pay-As-You-Go'}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       Status: <span className="font-semibold text-green-600 dark:text-green-400">Active</span>
@@ -110,27 +110,42 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
               </div>
 
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-gray-700 dark:text-gray-300">Unlimited queries</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  <span className="text-gray-700 dark:text-gray-300">Download reports</span>
-                </div>
-                {subscription.tier === 'unlimited' && (
+                {subscription.tier === 'subscription' ? (
                   <>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">100 queries per month</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">Download reports</span>
+                    </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       <span className="text-gray-700 dark:text-gray-300">Priority support</span>
                     </div>
+                  </>
+                ) : (
+                  <>
                     <div className="flex items-center gap-2 text-sm">
                       <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Early access to features</span>
+                      <span className="text-gray-700 dark:text-gray-300">Unlimited queries</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">Download reports</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <span className="text-gray-700 dark:text-gray-300">Pay only $0.25 per query</span>
                     </div>
                   </>
                 )}
@@ -235,7 +250,7 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Predictable costs</span> – Only pay for actual usage</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Pay only $0.25 per research</span> – No subscription needed</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
@@ -246,9 +261,10 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                 {/* Pricing */}
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">Usage-based</span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">$0.25</span>
+                    <span className="text-gray-500 dark:text-gray-400">/research</span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Model costs + 20% platform fee</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">No monthly commitment required</p>
 
                   <button className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group">
                     <span>Start with Pay-As-You-Go</span>
@@ -258,12 +274,12 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
               </div>
             </motion.div>
 
-            {/* Unlimited - For Power Users */}
+            {/* Subscription - For Regular Users */}
             <motion.div
               className="relative group cursor-pointer"
               whileHover={{ y: -4 }}
               transition={{ duration: 0.2 }}
-              onClick={() => handleUpgrade('unlimited')}
+              onClick={() => handleUpgrade('subscription')}
             >
               {/* Popular Badge */}
               <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-emerald-600 dark:bg-emerald-700 text-white text-xs font-semibold rounded-full flex items-center gap-1 shadow-lg">
@@ -279,8 +295,8 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                       <Sparkles className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Pro Unlimited</h3>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400">For serious researchers</p>
+                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Subscription</h3>
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400">For regular researchers</p>
                     </div>
                   </div>
                 </div>
@@ -289,7 +305,7 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                 <div className="space-y-3 mb-6 flex-1">
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Everything in Pay-As-You-Go</span>, plus:</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">100 queries per month</span> – Renews monthly</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -301,24 +317,25 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Early access</span> – New features first</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Full tool access</span> – All features included</p>
                   </div>
                   <div className="flex items-start gap-2">
                     <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Best for power users</span> – Heavy usage = big savings</p>
+                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Best value</span> – Just $0.20 per research</p>
                   </div>
                 </div>
 
                 {/* Pricing */}
                 <div className="pt-4 border-t border-emerald-100 dark:border-emerald-900/30">
                   <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">$50</span>
+                    <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">$20</span>
                     <span className="text-gray-500 dark:text-gray-400">/month</span>
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">~$6.67/day for unlimited research</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">100 queries included (~$0.20 each)</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-4">🎉 1 week free trial</p>
 
                   <button className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group shadow-lg">
-                    <span>Upgrade to Pro Unlimited</span>
+                    <span>Start Free Trial</span>
                     <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
                   </button>
                 </div>

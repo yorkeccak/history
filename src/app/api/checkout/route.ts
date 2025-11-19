@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const { plan } = await req.json();
     
     // Validate plan
-    if (!['pay_per_use', 'unlimited'].includes(plan)) {
+    if (!['pay_per_use', 'subscription'].includes(plan)) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
     }
 
@@ -37,8 +37,8 @@ export async function POST(req: NextRequest) {
     const polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN! });
 
     // Simple product mapping
-    const productId = plan === 'unlimited' 
-      ? process.env.POLAR_UNLIMITED_PRODUCT_ID
+    const productId = plan === 'subscription'
+      ? process.env.POLAR_SUBSCRIPTION_PRODUCT_ID
       : process.env.POLAR_PAY_PER_USE_PRODUCT_ID;
 
     if (!productId) {

@@ -72,9 +72,13 @@ export async function POST(req: Request) {
       
       if (activeSubscription) {
         // Determine tier from product ID
-        tier = activeSubscription.productId === process.env.POLAR_UNLIMITED_PRODUCT_ID 
-          ? 'unlimited' 
-          : 'pay_per_use';
+        if (activeSubscription.productId === process.env.POLAR_SUBSCRIPTION_PRODUCT_ID) {
+          tier = 'subscription'; // $20/month for 100 queries
+        } else if (activeSubscription.productId === process.env.POLAR_PAY_PER_USE_PRODUCT_ID) {
+          tier = 'pay_per_use'; // $0.25 per deep research run
+        } else {
+          tier = 'pay_per_use'; // Default to pay-per-use for unknown product IDs
+        }
         status = 'active';
         subscriptionId = activeSubscription.id;
       }
@@ -151,11 +155,14 @@ export async function POST(req: Request) {
           console.log(`[Webhook] ✅ Successfully updated user ${externalId} to free tier`);
         } else {
           // Active subscription - determine tier from product ID
-          const tier = productId === process.env.POLAR_UNLIMITED_PRODUCT_ID 
-            ? 'unlimited' 
-            : 'pay_per_use';
-          
-          console.log(`[Webhook] Product ID: ${productId}, Unlimited Product ID: ${process.env.POLAR_UNLIMITED_PRODUCT_ID}, Tier: ${tier}`);
+          let tier = 'pay_per_use'; // Default
+          if (productId === process.env.POLAR_SUBSCRIPTION_PRODUCT_ID) {
+            tier = 'subscription'; // $20/month for 100 queries
+          } else if (productId === process.env.POLAR_PAY_PER_USE_PRODUCT_ID) {
+            tier = 'pay_per_use'; // $0.25 per deep research run
+          }
+
+          console.log(`[Webhook] Product ID: ${productId}, Subscription Product ID: ${process.env.POLAR_SUBSCRIPTION_PRODUCT_ID}, Pay-Per-Use Product ID: ${process.env.POLAR_PAY_PER_USE_PRODUCT_ID}, Tier: ${tier}`);
           
           // Extract Polar customer ID and subscription ID
           const polarCustomerId = subscription.customer?.id || subscription.customerId;

@@ -8,7 +8,7 @@ import { Polar } from '@polar-sh/sdk';
 
 export interface AccessValidationResult {
   hasAccess: boolean;
-  tier: 'free' | 'pay_per_use' | 'unlimited';
+  tier: 'free' | 'pay_per_use' | 'subscription';
   usageBalance?: number;
   requiresPaymentSetup?: boolean;
 }
@@ -16,7 +16,7 @@ export interface AccessValidationResult {
 export async function validateAccess(userId: string): Promise<AccessValidationResult> {
   // Development mode bypass
   if (process.env.NEXT_PUBLIC_APP_MODE === 'development') {
-    return { hasAccess: true, tier: 'unlimited' };
+    return { hasAccess: true, tier: 'subscription' };
   }
 
   try {
@@ -38,18 +38,19 @@ export async function validateAccess(userId: string): Promise<AccessValidationRe
     const isActive = user?.subscription_status === 'active';
     const tier = (isActive && user?.subscription_tier) ? user.subscription_tier : 'free';
 
-    
-    // Unlimited and pay_per_use users have access when active
+
+
+    // Subscription and pay_per_use users have access when active
     // Free users always have access (but with rate limits)
     const hasAccess = isActive || tier === 'free';
 
     // Only require payment setup for free users who want to upgrade
     const requiresPaymentSetup = tier === 'free';
 
-    return { 
-      hasAccess, 
-      tier: tier as 'free' | 'pay_per_use' | 'unlimited',
-      requiresPaymentSetup 
+    return {
+      hasAccess,
+      tier: tier as 'free' | 'pay_per_use' | 'subscription',
+      requiresPaymentSetup
     };
     
   } catch (error: any) {

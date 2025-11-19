@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.users (
   email text NOT NULL UNIQUE,
   avatar_url text,
   subscription_tier text DEFAULT 'free'::text
-    CHECK (subscription_tier = ANY (ARRAY['free'::text, 'pay_per_use'::text, 'unlimited'::text])),
+    CHECK (subscription_tier = ANY (ARRAY['free'::text, 'pay_per_use'::text, 'subscription'::text])),
   polar_customer_id text UNIQUE,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
@@ -57,12 +57,36 @@ CREATE TABLE IF NOT EXISTS public.user_rate_limits (
   user_id uuid UNIQUE,
   usage_count integer NOT NULL DEFAULT 0,
   reset_date text NOT NULL,
+  monthly_usage_count integer NOT NULL DEFAULT 0,
+  monthly_reset_date text NOT NULL DEFAULT '',
   last_request_at timestamp with time zone DEFAULT now(),
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT user_rate_limits_pkey PRIMARY KEY (id),
   CONSTRAINT user_rate_limits_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE
 );
+
+-- Add monthly tracking columns if they don't exist
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'user_rate_limits'
+    AND column_name = 'monthly_usage_count'
+  ) THEN
+    ALTER TABLE public.user_rate_limits ADD COLUMN monthly_usage_count integer NOT NULL DEFAULT 0;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+    AND table_name = 'user_rate_limits'
+    AND column_name = 'monthly_reset_date'
+  ) THEN
+    ALTER TABLE public.user_rate_limits ADD COLUMN monthly_reset_date text NOT NULL DEFAULT '';
+  END IF;
+END $$;
 
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_research_tasks_user_id ON public.research_tasks(user_id);

@@ -13,15 +13,16 @@ export interface RateLimitResult {
 }
 
 // Constants for rate limiting
-const ANONYMOUS_LIMIT = 3;
-const FREE_LIMIT = 5;
-const UNLIMITED_LIMIT = 999999;
+const ANONYMOUS_LIMIT = 1; // Lifetime limit for anonymous users (not per day)
+const FREE_LIMIT = 3; // Per day limit for signed-up free users
+const SUBSCRIPTION_MONTHLY_LIMIT = 100; // Monthly limit for subscription users ($20/month)
+const UNLIMITED_LIMIT = 999999; // For pay-per-use users (tracked via Polar events)
 
 // Obfuscated cookie name
 const COOKIE_NAME = '$dekcuf_teg';
 
 /**
- * Anonymous users (before signup) - Cookie-based rate limiting
+ * Anonymous users (before signup) - Cookie-based rate limiting (LIFETIME, not daily)
  */
 export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
   if (isDevelopment) {
@@ -29,41 +30,24 @@ export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
       allowed: true,
       remaining: UNLIMITED_LIMIT,
       limit: UNLIMITED_LIMIT,
-      resetTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      resetTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Far future
       tier: 'development',
       used: 0
     };
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Decode cookie data
-  const decodeCookieData = (encoded: string | null): { count: number; date: string } => {
-    if (!encoded) return { count: 0, date: '' };
+  // Decode cookie data (no longer checking date for daily reset)
+  const decodeCookieData = (encoded: string | null): number => {
+    if (!encoded) return 0;
     try {
       const decoded = atob(encoded);
-      const [count, date] = decoded.split('|');
-      return { count: parseInt(count) || 0, date: date || '' };
+      return parseInt(decoded) || 0;
     } catch {
-      return { count: 0, date: '' };
+      return 0;
     }
   };
-  
-  const storedData = decodeCookieData(getCookie(COOKIE_NAME));
-  
-  // Reset if new day
-  if (storedData.date !== today) {
-    return {
-      allowed: true,
-      remaining: ANONYMOUS_LIMIT,
-      limit: ANONYMOUS_LIMIT,
-      resetTime: getNextMidnight(),
-      tier: 'anonymous',
-      used: 0
-    };
-  }
 
-  const used = storedData.count;
+  const used = decodeCookieData(getCookie(COOKIE_NAME));
   const remaining = Math.max(0, ANONYMOUS_LIMIT - used);
   const allowed = used < ANONYMOUS_LIMIT;
 
@@ -71,7 +55,7 @@ export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
     allowed,
     remaining,
     limit: ANONYMOUS_LIMIT,
-    resetTime: getNextMidnight(),
+    resetTime: new Date('2099-12-31'), // No reset - lifetime limit
     tier: 'anonymous',
     used
   };
@@ -105,28 +89,64 @@ export async function checkUserRateLimit(userId: string): Promise<RateLimitResul
     .single();
 
   // Determine tier from database subscription info
-  const tier = (user?.subscription_status === 'active' && user?.subscription_tier) 
-    ? user.subscription_tier 
+  const tier = (user?.subscription_status === 'active' && user?.subscription_tier)
+    ? user.subscription_tier
     : 'free';
+
   const today = new Date().toISOString().split('T')[0];
-  
+  const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM format
+
   const { data: rateLimitRecord } = await supabase
     .from('user_rate_limits')
-    .select('usage_count, reset_date')
+    .select('usage_count, reset_date, monthly_usage_count, monthly_reset_date')
     .eq('user_id', userId)
     .single();
 
-  // Calculate used first
-  const used = (rateLimitRecord && tier === 'free') ? (rateLimitRecord.reset_date === today ? rateLimitRecord.usage_count || 0 : 0) : rateLimitRecord?.usage_count || 0;
-  const limit = tier === 'free' ? FREE_LIMIT : UNLIMITED_LIMIT;
-  const remaining = tier === 'free' ? Math.max(0, limit - used) : UNLIMITED_LIMIT;
-  const allowed = used < limit;
+  // Calculate limits based on tier
+  let used = 0;
+  let limit = FREE_LIMIT;
+  let remaining = 0;
+  let resetTime = getNextMidnight();
+  let allowed = true;
+
+  if (tier === 'free') {
+    // Free tier: 3 per day
+    used = (rateLimitRecord && rateLimitRecord.reset_date === today)
+      ? (rateLimitRecord.usage_count || 0)
+      : 0;
+    limit = FREE_LIMIT;
+    remaining = Math.max(0, limit - used);
+    allowed = used < limit;
+    resetTime = getNextMidnight();
+  } else if (tier === 'subscription') {
+    // Subscription tier: 100 per month ($20/month)
+    used = (rateLimitRecord && rateLimitRecord.monthly_reset_date === currentMonth)
+      ? (rateLimitRecord.monthly_usage_count || 0)
+      : 0;
+    limit = SUBSCRIPTION_MONTHLY_LIMIT;
+    remaining = Math.max(0, limit - used);
+    allowed = used < limit;
+    resetTime = getNextMonthStart();
+  } else if (tier === 'pay_per_use') {
+    // Pay-per-use: Unlimited (charged $0.25 per run via Polar events)
+    used = rateLimitRecord?.usage_count || 0;
+    limit = UNLIMITED_LIMIT;
+    remaining = UNLIMITED_LIMIT;
+    allowed = true;
+    resetTime = new Date('2099-12-31');
+  } else {
+    // Unknown tier defaults to free
+    used = 0;
+    limit = FREE_LIMIT;
+    remaining = FREE_LIMIT;
+    allowed = true;
+  }
 
   return {
     allowed,
     remaining,
     limit,
-    resetTime: getNextMidnight(),
+    resetTime,
     tier,
     used
   };
@@ -216,6 +236,7 @@ export async function incrementRateLimit(userId?: string): Promise<RateLimitResu
 
 /**
  * Increment user rate limit in database
+ * Handles both daily (free tier) and monthly (subscription tier) increments
  */
 async function incrementUserRateLimit(userId: string): Promise<RateLimitResult> {
   const supabase = createClient(
@@ -224,6 +245,18 @@ async function incrementUserRateLimit(userId: string): Promise<RateLimitResult> 
   );
 
   const today = new Date().toISOString().split('T')[0];
+  const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM format
+
+  // Get user subscription info
+  const { data: user } = await supabase
+    .from('users')
+    .select('subscription_tier, subscription_status')
+    .eq('id', userId)
+    .single();
+
+  const tier = (user?.subscription_status === 'active' && user?.subscription_tier)
+    ? user.subscription_tier
+    : 'free';
 
   // Get current record
   const { data: existingRecord } = await supabase
@@ -232,44 +265,85 @@ async function incrementUserRateLimit(userId: string): Promise<RateLimitResult> 
     .eq('user_id', userId)
     .single();
 
-  let newUsageCount: number;
+  let updates: any = {
+    last_request_at: new Date().toISOString(),
+  };
 
-  if (existingRecord) {
-    // Check if it's a new day
-    if (existingRecord.reset_date !== today) {
-      // Reset for new day
-      newUsageCount = 1;
-      await supabase
-        .from('user_rate_limits')
-        .update({
-          usage_count: newUsageCount,
-          reset_date: today,
-          last_request_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
+  if (tier === 'free') {
+    // Free tier: Daily limit - increment usage_count
+    if (existingRecord) {
+      if (existingRecord.reset_date !== today) {
+        // Reset for new day
+        updates.usage_count = 1;
+        updates.reset_date = today;
+      } else {
+        // Increment existing usage
+        updates.usage_count = (existingRecord.usage_count || 0) + 1;
+      }
     } else {
-      // Increment existing usage
-      newUsageCount = (existingRecord.usage_count || 0) + 1;
+      // Create new record
       await supabase
         .from('user_rate_limits')
-        .update({
-          usage_count: newUsageCount,
+        .insert({
+          user_id: userId,
+          usage_count: 1,
+          reset_date: today,
+          monthly_usage_count: 0,
+          monthly_reset_date: currentMonth,
           last_request_at: new Date().toISOString(),
-        })
-        .eq('user_id', userId);
+        });
+      return await checkUserRateLimit(userId);
     }
-  } else {
-    // Create new record
-    newUsageCount = 1;
+  } else if (tier === 'subscription') {
+    // Subscription tier: Monthly limit - increment monthly_usage_count
+    if (existingRecord) {
+      if (existingRecord.monthly_reset_date !== currentMonth) {
+        // Reset for new month
+        updates.monthly_usage_count = 1;
+        updates.monthly_reset_date = currentMonth;
+      } else {
+        // Increment existing monthly usage
+        updates.monthly_usage_count = (existingRecord.monthly_usage_count || 0) + 1;
+      }
+    } else {
+      // Create new record
+      await supabase
+        .from('user_rate_limits')
+        .insert({
+          user_id: userId,
+          usage_count: 0,
+          reset_date: today,
+          monthly_usage_count: 1,
+          monthly_reset_date: currentMonth,
+          last_request_at: new Date().toISOString(),
+        });
+      return await checkUserRateLimit(userId);
+    }
+  } else if (tier === 'pay_per_use') {
+    // Pay-per-use: Just track total count (billed via Polar events)
+    if (existingRecord) {
+      updates.usage_count = (existingRecord.usage_count || 0) + 1;
+    } else {
+      await supabase
+        .from('user_rate_limits')
+        .insert({
+          user_id: userId,
+          usage_count: 1,
+          reset_date: today,
+          monthly_usage_count: 0,
+          monthly_reset_date: currentMonth,
+          last_request_at: new Date().toISOString(),
+        });
+      return await checkUserRateLimit(userId);
+    }
+  }
+
+  // Update existing record
+  if (existingRecord) {
     await supabase
       .from('user_rate_limits')
-      .insert({
-        user_id: userId,
-        usage_count: newUsageCount,
-        reset_date: today,
-        last_request_at: new Date().toISOString(),
-        tier: 'free',
-      });
+      .update(updates)
+      .eq('user_id', userId);
   }
 
   // Return updated rate limit status
@@ -277,36 +351,30 @@ async function incrementUserRateLimit(userId: string): Promise<RateLimitResult> 
 }
 
 /**
- * Increment anonymous rate limit in cookies
+ * Increment anonymous rate limit in cookies (lifetime limit, not daily)
  */
 async function incrementAnonymousRateLimit(): Promise<RateLimitResult> {
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Decode cookie data using the same encoding as checkAnonymousRateLimit
-  const decodeCookieData = (encoded: string | null): { count: number; date: string } => {
-    if (!encoded) return { count: 0, date: '' };
+  // Decode cookie data (simple count, no date)
+  const decodeCookieData = (encoded: string | null): number => {
+    if (!encoded) return 0;
     try {
       const decoded = atob(encoded);
-      const [count, date] = decoded.split('|');
-      return { count: parseInt(count) || 0, date: date || '' };
+      return parseInt(decoded) || 0;
     } catch {
-      return { count: 0, date: '' };
+      return 0;
     }
   };
 
-  const encodeCookieData = (count: number, date: string): string => {
-    return btoa(`${count}|${date}`);
+  const encodeCookieData = (count: number): string => {
+    return btoa(count.toString());
   };
 
-  const storedData = decodeCookieData(getCookie(COOKIE_NAME));
+  const currentCount = decodeCookieData(getCookie(COOKIE_NAME));
+  const newCount = currentCount + 1;
 
-  // Reset if new day
-  const isNewDay = storedData.date !== today;
-  const newCount = isNewDay ? 1 : storedData.count + 1;
-
-  // Update cookie with encoded data
-  const encodedData = encodeCookieData(newCount, today);
-  setCookie(COOKIE_NAME, encodedData);
+  // Update cookie with encoded data (lifetime cookie - 10 years)
+  const encodedData = encodeCookieData(newCount);
+  setCookieWithExpiry(COOKIE_NAME, encodedData, 365 * 10); // 10 years
 
   const remaining = Math.max(0, ANONYMOUS_LIMIT - newCount);
   const allowed = newCount <= ANONYMOUS_LIMIT;
@@ -315,42 +383,32 @@ async function incrementAnonymousRateLimit(): Promise<RateLimitResult> {
     allowed,
     remaining,
     limit: ANONYMOUS_LIMIT,
-    resetTime: getNextMidnight(),
+    resetTime: new Date('2099-12-31'), // No reset - lifetime limit
     tier: 'anonymous',
     used: newCount
   };
 }
 
 /**
- * Get current anonymous usage from cookies
+ * Get current anonymous usage from cookies (lifetime count)
  */
 function getAnonymousUsage(): { used: number; remaining: number } {
   if (typeof window === 'undefined') {
     return { used: 0, remaining: ANONYMOUS_LIMIT };
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Decode cookie data
-  const decodeCookieData = (encoded: string | null): { count: number; date: string } => {
-    if (!encoded) return { count: 0, date: '' };
+  // Decode cookie data (simple count)
+  const decodeCookieData = (encoded: string | null): number => {
+    if (!encoded) return 0;
     try {
       const decoded = atob(encoded);
-      const [count, date] = decoded.split('|');
-      return { count: parseInt(count) || 0, date: date || '' };
+      return parseInt(decoded) || 0;
     } catch {
-      return { count: 0, date: '' };
+      return 0;
     }
   };
-  
-  const storedData = decodeCookieData(getCookie(COOKIE_NAME));
 
-  // If new day, no usage to transfer
-  if (storedData.date !== today) {
-    return { used: 0, remaining: ANONYMOUS_LIMIT };
-  }
-
-  const used = storedData.count;
+  const used = decodeCookieData(getCookie(COOKIE_NAME));
   const remaining = Math.max(0, ANONYMOUS_LIMIT - used);
 
   return { used, remaining };
@@ -381,9 +439,17 @@ function getCookie(name: string): string | null {
 
 function setCookie(name: string, value: string): void {
   if (typeof window === 'undefined') return;
-  
+
   const expires = new Date();
   expires.setTime(expires.getTime() + 24 * 60 * 60 * 1000); // 24 hours
+  document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+}
+
+function setCookieWithExpiry(name: string, value: string, days: number): void {
+  if (typeof window === 'undefined') return;
+
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
   document.cookie = `${name}=${value}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
 }
 
@@ -394,17 +460,33 @@ function getNextMidnight(): Date {
   return tomorrow;
 }
 
+function getNextMonthStart(): Date {
+  const nextMonth = new Date();
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+  nextMonth.setDate(1);
+  nextMonth.setHours(0, 0, 0, 0);
+  return nextMonth;
+}
+
 /**
  * Rate limit display helper
  */
 export function getRateLimitDisplay(rateLimit: RateLimitResult | null): string {
   if (!rateLimit) return 'Loading...';
-  
+
   if (isDevelopment) return 'Dev Mode';
-  
-  if (rateLimit.tier === 'unlimited' || rateLimit.tier === 'pay_per_use') {
-    return `${rateLimit.used}/∞ queries`;
+
+  if (rateLimit.tier === 'pay_per_use') {
+    return `${rateLimit.used}/∞ queries (pay-per-use)`;
   }
-  
-  return `${rateLimit.used}/${rateLimit.limit} queries`;
+
+  if (rateLimit.tier === 'subscription') {
+    return `${rateLimit.used}/${rateLimit.limit} queries this month`;
+  }
+
+  if (rateLimit.tier === 'anonymous') {
+    return `${rateLimit.used}/${rateLimit.limit} lifetime queries`;
+  }
+
+  return `${rateLimit.used}/${rateLimit.limit} queries today`;
 }

@@ -7,18 +7,21 @@ export class PolarEventTracker {
   constructor() {
     // Check environment consistently with chat API
     this.isDevelopment = process.env.NEXT_PUBLIC_APP_MODE === 'development';
-    
+
     // Only initialize Polar in production
     if (!this.isDevelopment) {
       if (!process.env.POLAR_ACCESS_TOKEN) {
-        throw new Error('Polar access token required for production event tracking');
+        console.error('[PolarEventTracker] Missing POLAR_ACCESS_TOKEN - event tracking disabled');
+        return;
       }
-      
+
       this.polar = new Polar({
         accessToken: process.env.POLAR_ACCESS_TOKEN,
       });
-      
+
+      console.log('[PolarEventTracker] Initialized successfully');
     } else {
+      console.log('[PolarEventTracker] Development mode - event tracking disabled');
     }
   }
 
@@ -184,12 +187,61 @@ export class PolarEventTracker {
   }
 
   /**
+   * Track Deep Research usage
+   * $0.25 per deep research run for pay-per-use customers
+   */
+  async trackDeepResearch(
+    userId: string,
+    taskId: string,
+    locationName: string,
+    metadata: any = {}
+  ) {
+    // Skip in development
+    if (this.isDevelopment || !this.polar) {
+      console.log('[PolarEventTracker] Skipping deep research tracking in development');
+      return;
+    }
+
+    // Input validation
+    if (!userId || !taskId) {
+      console.error('[PolarEventTracker] Missing userId or taskId for deep research tracking');
+      return;
+    }
+
+    try {
+      // Fixed $0.25 charge per deep research run
+      const costDollars = 0.25;
+
+      console.log(`[PolarEventTracker] Tracking deep research for user ${userId}, task ${taskId}, cost: $${costDollars}`);
+
+      // Send event to Polar
+      await this.polar.events.ingest({
+        events: [{
+          name: 'deep_research',
+          externalCustomerId: userId,
+          metadata: {
+            cost_dollars: costDollars, // This will be summed in Polar meter
+            task_id: taskId,
+            location_name: locationName,
+            timestamp: new Date().toISOString(),
+            ...metadata
+          }
+        }]
+      });
+
+      console.log(`[PolarEventTracker] Successfully tracked deep research event for user ${userId}`);
+    } catch (error) {
+      console.error('[PolarEventTracker] Failed to track deep research event:', error);
+    }
+  }
+
+  /**
    * Check if user should be tracked for billing
    */
   async shouldTrackUsage(userId: string): Promise<boolean> {
     // Skip in development
     if (this.isDevelopment) return false;
-    
+
     // In production, we'll track for pay-per-use users
     // This will be used in tools to determine if events should be sent
     return true; // Let Polar handle the customer tier logic

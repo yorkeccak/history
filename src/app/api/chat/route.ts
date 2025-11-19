@@ -1,6 +1,7 @@
 import { checkAnonymousRateLimit, incrementRateLimit } from "@/lib/rate-limit";
 import { checkUserRateLimit } from '@/lib/rate-limit';
 import { validateAccess } from '@/lib/polar-access-validation';
+import { PolarEventTracker } from '@/lib/polar-events';
 import * as db from '@/lib/db';
 import { isDevelopmentMode } from '@/lib/local-db/local-auth';
 import { saveChatMessages } from '@/lib/db';
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
           return new Response(
             JSON.stringify({
               error: "RATE_LIMIT_EXCEEDED",
-              message: "You have exceeded your daily limit of 5 queries. Sign up to continue.",
+              message: "You have used your free query. Sign up to get 3 queries per day for free!",
               resetTime: rateLimitStatus.resetTime.toISOString(),
               remaining: rateLimitStatus.remaining,
             }),
@@ -206,6 +207,33 @@ Please be thorough and well-researched, citing historical sources where possible
     const taskData = await taskResponse.json();
     const taskId = taskData.deepresearch_id;
     console.log("[Chat API] Created DeepResearch task:", taskId);
+
+    // Track usage for pay-per-use customers via Polar events
+    if (!isDevelopment && user) {
+      try {
+        // Get user tier to check if they're on pay-per-use plan
+        const { data: userData } = await db.getUserProfile(user.id);
+        const tier = userData?.subscription_tier || userData?.subscriptionTier || 'free';
+
+        if (tier === 'pay_per_use') {
+          console.log("[Chat API] Tracking pay-per-use deep research event for user:", user.id);
+          const eventTracker = new PolarEventTracker();
+          await eventTracker.trackDeepResearch(
+            user.id,
+            taskId,
+            location?.name || 'Unknown',
+            {
+              location_lat: location?.lat || 0,
+              location_lng: location?.lng || 0,
+              model: model
+            }
+          );
+        }
+      } catch (error) {
+        console.error("[Chat API] Failed to track deep research event:", error);
+        // Don't fail the request if event tracking fails
+      }
+    }
 
     // Save research task to database
     if (!isDevelopment) {
