@@ -409,19 +409,17 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
 
         return { completed: false };
       } else if (statusData.status === 'completed') {
-        // Only update state if we have actual data, otherwise keep existing data
-        // This prevents showing empty content when switching from running to completed
-
-        // Set content from output field first (this is the final report)
+        // Set content from output field (this contains the final markdown report)
         if (statusData.output) {
           setContent(statusData.output);
         }
 
+        // Update messages for timeline/reasoning view
         if (statusData.messages && Array.isArray(statusData.messages) && statusData.messages.length > 0) {
           setMessages([...statusData.messages]);
           setMessagesVersion(v => v + 1);
 
-          // Only extract content from messages if output wasn't provided
+          // Fallback: extract content from last message if output wasn't provided
           if (!statusData.output) {
             const lastMessage = statusData.messages[statusData.messages.length - 1];
             if (lastMessage?.role === 'assistant' && Array.isArray(lastMessage.content)) {
