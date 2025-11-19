@@ -10,6 +10,7 @@ export interface RateLimitResult {
   resetTime: Date;
   tier: string;
   used: number;
+  cookieValue?: string; // For server-side cookie setting
 }
 
 // Constants for rate limiting
@@ -23,8 +24,9 @@ const COOKIE_NAME = '$dekcuf_teg';
 
 /**
  * Anonymous users (before signup) - Cookie-based rate limiting (LIFETIME, not daily)
+ * Pass cookies from request headers for server-side usage
  */
-export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
+export async function checkAnonymousRateLimit(cookieHeader?: string): Promise<RateLimitResult> {
   if (isDevelopment) {
     return {
       allowed: true,
@@ -40,14 +42,15 @@ export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
   const decodeCookieData = (encoded: string | null): number => {
     if (!encoded) return 0;
     try {
-      const decoded = atob(encoded);
+      const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
       return parseInt(decoded) || 0;
     } catch {
       return 0;
     }
   };
 
-  const used = decodeCookieData(getCookie(COOKIE_NAME));
+  const cookieValue = cookieHeader ? parseCookieHeader(cookieHeader, COOKIE_NAME) : getCookie(COOKIE_NAME);
+  const used = decodeCookieData(cookieValue);
   const remaining = Math.max(0, ANONYMOUS_LIMIT - used);
   const allowed = used < ANONYMOUS_LIMIT;
 
@@ -59,6 +62,20 @@ export async function checkAnonymousRateLimit(): Promise<RateLimitResult> {
     tier: 'anonymous',
     used
   };
+}
+
+/**
+ * Parse cookie from request header (server-side)
+ */
+function parseCookieHeader(cookieHeader: string, name: string): string | null {
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  for (const cookie of cookies) {
+    const [key, value] = cookie.split('=');
+    if (key === name) {
+      return value;
+    }
+  }
+  return null;
 }
 
 /**
@@ -218,11 +235,11 @@ export async function transferAnonymousToUser(userId: string): Promise<void> {
 /**
  * Increment usage (handles both anonymous and authenticated)
  */
-export async function incrementRateLimit(userId?: string): Promise<RateLimitResult> {
+export async function incrementRateLimit(userId?: string, cookieHeader?: string): Promise<RateLimitResult> {
   if (isDevelopment) {
-    return userId 
+    return userId
       ? await checkUserRateLimit(userId)
-      : await checkAnonymousRateLimit();
+      : await checkAnonymousRateLimit(cookieHeader);
   }
 
   if (userId) {
@@ -230,7 +247,7 @@ export async function incrementRateLimit(userId?: string): Promise<RateLimitResu
     return await incrementUserRateLimit(userId);
   } else {
     // Anonymous user - increment cookies
-    return await incrementAnonymousRateLimit();
+    return await incrementAnonymousRateLimit(cookieHeader);
   }
 }
 
@@ -353,12 +370,12 @@ async function incrementUserRateLimit(userId: string): Promise<RateLimitResult> 
 /**
  * Increment anonymous rate limit in cookies (lifetime limit, not daily)
  */
-async function incrementAnonymousRateLimit(): Promise<RateLimitResult> {
+async function incrementAnonymousRateLimit(cookieHeader?: string): Promise<RateLimitResult> {
   // Decode cookie data (simple count, no date)
   const decodeCookieData = (encoded: string | null): number => {
     if (!encoded) return 0;
     try {
-      const decoded = atob(encoded);
+      const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
       return parseInt(decoded) || 0;
     } catch {
       return 0;
@@ -366,15 +383,21 @@ async function incrementAnonymousRateLimit(): Promise<RateLimitResult> {
   };
 
   const encodeCookieData = (count: number): string => {
-    return btoa(count.toString());
+    return Buffer.from(count.toString()).toString('base64');
   };
 
-  const currentCount = decodeCookieData(getCookie(COOKIE_NAME));
+  const cookieValue = cookieHeader ? parseCookieHeader(cookieHeader, COOKIE_NAME) : getCookie(COOKIE_NAME);
+  const currentCount = decodeCookieData(cookieValue);
   const newCount = currentCount + 1;
 
-  // Update cookie with encoded data (lifetime cookie - 10 years)
+  // Encode new cookie value
   const encodedData = encodeCookieData(newCount);
-  setCookieWithExpiry(COOKIE_NAME, encodedData, 365 * 10); // 10 years
+
+  // For server-side: return cookie value to be set via Set-Cookie header
+  // For client-side: set cookie directly
+  if (typeof window !== 'undefined') {
+    setCookieWithExpiry(COOKIE_NAME, encodedData, 365 * 10); // 10 years
+  }
 
   const remaining = Math.max(0, ANONYMOUS_LIMIT - newCount);
   const allowed = newCount <= ANONYMOUS_LIMIT;
@@ -385,7 +408,8 @@ async function incrementAnonymousRateLimit(): Promise<RateLimitResult> {
     limit: ANONYMOUS_LIMIT,
     resetTime: new Date('2099-12-31'), // No reset - lifetime limit
     tier: 'anonymous',
-    used: newCount
+    used: newCount,
+    cookieValue: encodedData // For server-side to set via Set-Cookie header
   };
 }
 

@@ -78,7 +78,8 @@ export async function POST(req: Request) {
     // Check rate limit for user-initiated messages
     if (isUserInitiated && !isDevelopment) {
       if (!user) {
-        const rateLimitStatus = await checkAnonymousRateLimit();
+        const cookieHeader = req.headers.get('cookie') || '';
+        const rateLimitStatus = await checkAnonymousRateLimit(cookieHeader);
         console.log("[Chat API] Anonymous rate limit status:", rateLimitStatus);
 
         if (!rateLimitStatus.allowed) {
@@ -505,11 +506,18 @@ Please be thorough and well-researched, citing historical sources where possible
     });
 
     // Increment rate limit after successful validation
+    let anonymousCookieValue: string | undefined;
     if (isUserInitiated && !isDevelopment) {
       console.log("[Chat API] Incrementing rate limit for user-initiated message");
       try {
-        const rateLimitResult = await incrementRateLimit(user?.id);
+        const cookieHeader = req.headers.get('cookie') || '';
+        const rateLimitResult = await incrementRateLimit(user?.id, cookieHeader);
         console.log("[Chat API] Rate limit incremented:", rateLimitResult);
+
+        // Store cookie value for anonymous users to set in response
+        if (!user && rateLimitResult.cookieValue) {
+          anonymousCookieValue = rateLimitResult.cookieValue;
+        }
       } catch (error) {
         console.error("[Chat API] Failed to increment rate limit:", error);
       }
@@ -521,6 +529,13 @@ Please be thorough and well-researched, citing historical sources where possible
       'Connection': 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
+
+    // Set anonymous rate limit cookie
+    if (anonymousCookieValue) {
+      const expires = new Date();
+      expires.setTime(expires.getTime() + 365 * 10 * 24 * 60 * 60 * 1000); // 10 years
+      headers.set('Set-Cookie', `$dekcuf_teg=${anonymousCookieValue}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`);
+    }
 
     if (isDevelopment) {
       headers.set("X-Development-Mode", "true");
