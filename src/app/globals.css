@@ -204,11 +204,6 @@
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Hide Mapbox logo */
-.mapboxgl-ctrl-logo {
-  display: none !important;
-}
-
 /* Force all prose elements to respect container width */
 .prose * {
   max-width: 100%;
