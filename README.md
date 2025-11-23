@@ -1,5 +1,7 @@
 # History
 
+**[history.valyu.ai](https://history.valyu.ai)**
+
 > I can't stop doomscrolling Google Maps so I built AI that researches anywhere on Earth
 
 An interactive 3D globe that lets you explore the fascinating history of any location on the planet. Born from opening Google Maps in satellite view at 2am and clicking on random shit - obscure atolls in the Pacific that look like someone dropped a pixel, unnamed mountains in Kyrgyzstan, Arctic settlements with 9 people. Places so remote they don't have Wikipedia pages.
