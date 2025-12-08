@@ -11,6 +11,18 @@ const VALYU_API_KEY = process.env.VALYU_API_KEY;
 
 export const maxDuration = 300; // 5 minutes max for PDF generation
 
+// Dynamic import of chromium for Vercel production
+let chromium: any = null;
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction) {
+  try {
+    chromium = require('@sparticuz/chromium');
+  } catch (e) {
+    console.warn('[PDF Generation] @sparticuz/chromium not available');
+  }
+}
+
 async function markdownToHtml(markdown: string): Promise<string> {
   const result = await remark().use(html).process(markdown);
   return result.toString();
@@ -315,10 +327,22 @@ export async function POST(request: NextRequest) {
     `;
 
     // Launch Puppeteer and generate PDF
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    let browser;
+    if (isProduction && chromium) {
+      // Use @sparticuz/chromium for Vercel serverless
+      browser = await puppeteer.launch({
+        args: chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+    } else {
+      // Local development
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
+    }
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
