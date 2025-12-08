@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
 import { remark } from 'remark';
 import html from 'remark-html';
+import { isDevelopmentMode } from '@/lib/local-db/local-auth';
 
+const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
+const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
 const DEEPRESEARCH_API_URL = 'https://api.valyu.ai/v1/deepresearch';
-const DEEPRESEARCH_API_KEY = process.env.VALYU_API_KEY;
+const VALYU_API_KEY = process.env.VALYU_API_KEY;
 
 export const maxDuration = 300; // 5 minutes max for PDF generation
 
@@ -180,7 +183,7 @@ function generatePdfStyles(): string {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { taskId, locationName } = body;
+    const { taskId, locationName, valyuAccessToken } = body;
 
     if (!taskId || !locationName) {
       return NextResponse.json(
@@ -189,24 +192,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!DEEPRESEARCH_API_KEY) {
+    const isDevelopment = isDevelopmentMode();
+
+    // Require auth token in production
+    if (!isDevelopment && !valyuAccessToken) {
       return NextResponse.json(
-        { error: 'Server configuration error: Missing API key' },
-        { status: 500 }
+        { error: 'Authentication required' },
+        { status: 401 }
       );
     }
 
-    // Fetch research data from Valyu API
-    const response = await fetch(
-      `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
-      {
-        method: 'GET',
+    let response: Response;
+
+    // Fetch research data via OAuth proxy or direct API (dev mode)
+    if (valyuAccessToken) {
+      response = await fetch(VALYU_OAUTH_PROXY_URL, {
+        method: 'POST',
         headers: {
-          'X-API-Key': DEEPRESEARCH_API_KEY,
+          'Authorization': `Bearer ${valyuAccessToken}`,
+          'Content-Type': 'application/json',
         },
-        cache: 'no-store',
-      }
-    );
+        body: JSON.stringify({
+          path: `/v1/deepresearch/tasks/${taskId}/status`,
+          method: 'GET',
+        }),
+      });
+    } else if (isDevelopment && VALYU_API_KEY) {
+      response = await fetch(
+        `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
+        {
+          method: 'GET',
+          headers: {
+            'X-API-Key': VALYU_API_KEY,
+          },
+          cache: 'no-store',
+        }
+      );
+    } else {
+      return NextResponse.json(
+        { error: 'Server configuration error' },
+        { status: 500 }
+      );
+    }
 
     if (!response.ok) {
       return NextResponse.json(

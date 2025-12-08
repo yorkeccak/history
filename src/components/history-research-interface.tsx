@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Loader2, MapPin, ExternalLink, FileText, Lightbulb, CornerDownRight, Globe2, CheckCircle2, Brain, Clock, Sparkles, Share2, Check, Copy, Compass, Download } from 'lucide-react';
+import { X, Loader2, MapPin, ExternalLink, FileText, Lightbulb, CornerDownRight, Globe2, CheckCircle2, Brain, Clock, Sparkles, Share2, Check, Copy, Compass, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PhotoGallery } from '@/components/ui/gallery';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -13,7 +13,7 @@ import { Favicon } from '@/components/ui/favicon';
 import { ReasoningDialog } from '@/components/reasoning-dialog';
 import { calculateAgentMetrics } from '@/lib/metrics-calculator';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
-import { useRateLimit } from '@/lib/hooks/use-rate-limit';
+import { loadValyuTokens } from '@/lib/valyu-oauth';
 import { Globe } from '@/components/globe';
 
 interface Source {
@@ -248,10 +248,9 @@ const TimelineItem = ({ item, idx, timeline, animated = true }: { item: any; idx
 };
 
 export function HistoryResearchInterface({ location, onClose, onTaskCreated, initialTaskId, customInstructions, initialImages }: HistoryResearchInterfaceProps) {
-  const { user } = useAuthStore();
-  const { increment, refresh } = useRateLimit();
+  const { user, valyuAccessToken } = useAuthStore();
   const [status, setStatus] = useState<'idle' | 'queued' | 'running' | 'completed' | 'error'>('idle');
-  const [showMiniGlobe, setShowMiniGlobe] = useState(false);
+  const [showMiniGlobe, setShowMiniGlobe] = useState(true);
   const [content, setContent] = useState<string>('');
   const [sources, setSources] = useState<Source[]>([]);
   const [images, setImages] = useState<ResearchImage[]>([]);
@@ -338,6 +337,7 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
         body: JSON.stringify({
           taskId: taskId,
           locationName: displayLocation.name,
+          valyuAccessToken,
         }),
       });
 
@@ -405,19 +405,26 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
 
   const pollTaskStatus = useCallback(async (taskId: string) => {
     try {
-      const response = await fetch(`/api/chat/poll?taskId=${taskId}`);
+      const headers: HeadersInit = {};
+      if (valyuAccessToken) {
+        headers['Authorization'] = `Bearer ${valyuAccessToken}`;
+      }
+      const response = await fetch(`/api/chat/poll?taskId=${taskId}`, { headers });
       if (!response.ok) {
         throw new Error('Failed to poll task status');
       }
 
       const statusData = await response.json();
+      console.log('[Poll Client] Status:', statusData.status, 'hasOutput:', !!statusData.output);
 
       // Update progress
       if (statusData.status === 'running') {
         setStatus('running');
+        // Progress info is in statusData.progress object
+        const progress = statusData.progress || {};
         setProgress({
-          current: statusData.current_step || 0,
-          total: statusData.total_steps || 10,
+          current: progress.current_step || progress.step || 0,
+          total: progress.total_steps || progress.total || 10,
         });
 
         // Extract location from query if displayLocation not set properly
@@ -500,6 +507,7 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
         }
 
         // Set status to completed LAST, after all content is ready
+        console.log('[Poll Client] Setting status to completed, content length:', extractedContent.length);
         setStatus('completed');
         return { completed: true };
       } else if (statusData.status === 'failed') {
@@ -510,7 +518,7 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
     } catch (err) {
       throw err;
     }
-  }, [displayLocation]);
+  }, [displayLocation, valyuAccessToken]);
 
   useEffect(() => {
     if (initialTaskId && !taskId) {
@@ -560,6 +568,10 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
           ? `${customInstructions}\n\nLocation: ${location.name}`
           : `Research the history of ${location.name}`;
 
+        // Get Valyu access token if available
+        const valyuTokens = loadValyuTokens();
+        const valyuAccessToken = valyuTokens?.accessToken;
+
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: {
@@ -573,23 +585,31 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
               },
             ],
             location,
+            valyuAccessToken,
           }),
         });
 
         if (!response.ok) {
-          // Handle rate limit errors specially
-          if (response.status === 429) {
+          // Handle auth required errors
+          if (response.status === 401) {
             const errorData = await response.json();
-            const rateLimitError = new Error(errorData.message || 'Rate limit exceeded');
-            (rateLimitError as any).isRateLimit = true;
-            (rateLimitError as any).rateLimitData = errorData;
-            throw rateLimitError;
+            if (errorData.error === 'AUTH_REQUIRED') {
+              // Show auth modal
+              window.dispatchEvent(new CustomEvent('show-auth-modal'));
+              setStatus('idle');
+              onClose();
+              return;
+            }
+          }
+          // Handle credit errors
+          if (response.status === 402) {
+            const errorData = await response.json();
+            const creditError = new Error(errorData.message || 'Insufficient credits');
+            (creditError as any).isCredit = true;
+            throw creditError;
           }
           throw new Error('Failed to start research');
         }
-
-        // API call succeeded - refresh rate limit to reflect the increment done by the API
-        await refresh();
 
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
@@ -697,15 +717,12 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
           }
         }
       } catch (err) {
-
-        // Handle rate limit errors by showing signup prompt instead of error state
-        if ((err as any).isRateLimit) {
-          setStatus('idle');
-          onClose();
-          return;
+        // Handle credit errors by showing a user-friendly message
+        if ((err as any).isCredit) {
+          setError('Insufficient Valyu credits. Add credits at platform.valyu.ai');
+        } else {
+          setError(err instanceof Error ? err.message : 'Unknown error');
         }
-
-        setError(err instanceof Error ? err.message : 'Unknown error');
         setStatus('error');
       }
     };
@@ -869,19 +886,11 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
             animate={{ width: 384 }}
             exit={{ width: 0 }}
             transition={{ duration: 0.3, ease: "easeInOut" }}
-            className="hidden lg:block h-full border-r border-border/30 bg-background/20 backdrop-blur-sm overflow-hidden"
+            className="hidden lg:block h-full border-r border-border/30 bg-background/20 backdrop-blur-sm overflow-hidden relative"
           >
             <div className="h-full p-4 flex flex-col">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center mb-2">
                 <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Location</div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowMiniGlobe(false)}
-                  className="h-6 w-6"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
               </div>
               <div className="flex-1 rounded-lg overflow-hidden border border-border/50 shadow-xl">
                 <Globe
@@ -898,21 +907,29 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
         )}
       </AnimatePresence>
 
+      {/* Mini Globe Toggle Button - Middle Left */}
+      <div className="hidden lg:flex absolute left-0 top-1/2 -translate-y-1/2 z-20" style={{ left: showMiniGlobe ? '384px' : '0px', transition: 'left 0.3s ease-in-out' }}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setShowMiniGlobe(!showMiniGlobe)}
+          className="rounded-l-none rounded-r-lg h-16 w-6 px-0 border-l-0 shadow-md"
+          title={showMiniGlobe ? "Hide map" : "Show map"}
+        >
+          {showMiniGlobe ? (
+            <ChevronLeft className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </Button>
+      </div>
+
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="h-14 sm:h-16 border-b border-border/30 bg-background/30 backdrop-blur-xl flex items-center justify-between px-3 sm:px-6 z-10 flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowMiniGlobe(!showMiniGlobe)}
-            className="hidden lg:flex h-9 w-9 flex-shrink-0"
-            title="Toggle location map"
-          >
-            <MapPin className="h-4 w-4" />
-          </Button>
-          <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0 lg:hidden" />
+          <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
           <div className="min-w-0 flex-1 flex items-center">
             <div className="min-w-0">
               <h2 className="text-sm sm:text-lg font-semibold truncate">{displayLocation.name}</h2>

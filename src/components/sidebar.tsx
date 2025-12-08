@@ -8,15 +8,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
 import { createClient } from '@/utils/supabase/client-wrapper';
 import {
-  MessageSquare,
-  MessagesSquare,
-  MessageCirclePlus,
   History,
   Settings,
   LogOut,
-  Trash2,
   CreditCard,
-  BarChart3,
   Plus,
   Building2,
   MapPin,
@@ -31,7 +26,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { SettingsModal } from '@/components/user/settings-modal';
 import { SubscriptionModal } from '@/components/user/subscription-modal';
-import { useSubscription } from '@/hooks/use-subscription';
 import { EnterpriseContactModal } from '@/components/enterprise/enterprise-contact-modal';
 
 interface SidebarProps {
@@ -173,29 +167,10 @@ export function Sidebar({
     router.push('/');
   };
 
-  const handleViewUsage = async () => {
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      const response = await fetch('/api/customer-portal', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`
-        }
-      });
-
-      if (response.ok) {
-        const { redirectUrl } = await response.json();
-        window.open(redirectUrl, '_blank');
-      }
-    } catch (error) {
-      // Fail silently - non-critical operation
-    }
+  const handleManageCredits = () => {
+    // Open Valyu Platform for credit management
+    window.open('https://platform.valyu.ai', '_blank');
   };
-
-  // Get subscription status from database
-  const subscription = useSubscription();
-  const { isPaid } = subscription;
 
   return (
     <>
@@ -346,35 +321,19 @@ export function Sidebar({
               {/* Divider */}
               {user && !isDevelopment && <div className="w-10 h-px bg-gradient-to-r from-transparent via-border to-transparent my-1" />}
 
-              {/* Billing/Subscription - Hidden in development mode */}
+              {/* Valyu Credits - Hidden in development mode */}
               {user && !isDevelopment && (
-                <>
-                  {!isPaid ? (
-                    <div className="relative group/tooltip">
-                      <button
-                        onClick={() => setShowSubscription(true)}
-                        className="w-12 h-12 flex items-center justify-center hover:bg-accent rounded-[20px] transition-all duration-200 group hover:scale-110 active:scale-95"
-                      >
-                        <CreditCard className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </button>
-                      <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-popover text-popover-foreground text-sm font-medium rounded-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-border shadow-md">
-                        Upgrade
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="relative group/tooltip">
-                      <button
-                        onClick={handleViewUsage}
-                        className="w-12 h-12 flex items-center justify-center hover:bg-accent rounded-[20px] transition-all duration-200 group hover:scale-110 active:scale-95"
-                      >
-                        <BarChart3 className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
-                      </button>
-                      <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-popover text-popover-foreground text-sm font-medium rounded-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-border shadow-md">
-                        Usage & Billing
-                      </div>
-                    </div>
-                  )}
-                </>
+                <div className="relative group/tooltip">
+                  <button
+                    onClick={handleManageCredits}
+                    className="w-12 h-12 flex items-center justify-center hover:bg-accent rounded-[20px] transition-all duration-200 group hover:scale-110 active:scale-95"
+                  >
+                    <CreditCard className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </button>
+                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-popover text-popover-foreground text-sm font-medium rounded-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-border shadow-md">
+                    Manage Credits
+                  </div>
+                </div>
               )}
 
               {/* Enterprise */}

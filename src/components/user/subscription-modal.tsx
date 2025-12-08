@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
-import { createClient } from '@/utils/supabase/client-wrapper';
-import { useSubscription } from '@/hooks/use-subscription';
 import {
   Dialog,
   DialogContent,
@@ -12,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, TrendingUp, Clock, Shield, Sparkles, Check, Crown, BarChart3, Building2 } from 'lucide-react';
+import { ExternalLink, Zap, Check, Wallet, Building2 } from 'lucide-react';
 import { track } from '@vercel/analytics';
 import { EnterpriseContactModal } from '@/components/enterprise/enterprise-contact-modal';
 
@@ -23,67 +21,30 @@ interface SubscriptionModalProps {
 
 export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
   const user = useAuthStore((state) => state.user);
-  const subscription = useSubscription();
-  const [loading, setLoading] = useState(false);
+  const valyuAccessToken = useAuthStore((state) => state.valyuAccessToken);
   const [showEnterpriseModal, setShowEnterpriseModal] = useState(false);
 
   const handleEnterpriseClick = () => {
     track('Enterprise CTA Clicked', { source: 'subscription_modal' });
-    onClose(); // Close subscription modal
-    // Use a small delay to prevent both modals from closing
+    onClose();
     setTimeout(() => {
       setShowEnterpriseModal(true);
     }, 100);
   };
 
-  const handleUpgrade = async (planType: string) => {
-    // Track plan selection
-    track('Plan Selected', {
-      plan: planType,
-      source: 'subscription_modal'
-    });
-
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-
-      // Create Polar checkout session
-      const response = await fetch('/api/checkout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ plan: planType })
-      });
-
-      if (response.ok) {
-        const { checkoutUrl } = await response.json();
-
-        // Track checkout started
-        track('Checkout Started', {
-          plan: planType,
-          source: 'subscription_modal'
-        });
-
-        window.location.href = checkoutUrl;
-      }
-    } catch (error) {
-      // Fail silently - non-critical operation
-    } finally {
-      setLoading(false);
-    }
+  const handleManageCredits = () => {
+    track('Manage Credits Clicked', { source: 'subscription_modal' });
+    window.open('https://platform.valyu.ai', '_blank');
   };
 
-  // If user has an active subscription, show current plan info
-  if (subscription.isPaid) {
+  // Show Valyu credits management for authenticated users
+  if (user && valyuAccessToken) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="!max-w-2xl bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700">
           <DialogHeader className="space-y-3 pb-6">
             <DialogTitle className="text-2xl font-semibold text-gray-900 dark:text-gray-100 text-center">
-              Your Subscription
+              Your Valyu Credits
             </DialogTitle>
           </DialogHeader>
 
@@ -93,78 +54,50 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-3 bg-blue-600 dark:bg-blue-700 rounded-lg">
-                    {subscription.tier === 'unlimited' ? (
-                      <Crown className="h-6 w-6 text-white" />
-                    ) : (
-                      <Zap className="h-6 w-6 text-white" />
-                    )}
+                    <Wallet className="h-6 w-6 text-white" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                      {subscription.tier === 'unlimited' ? 'Subscription' : 'Pay-As-You-Go'}
+                      Valyu Credits
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Status: <span className="font-semibold text-green-600 dark:text-green-400">Active</span>
+                      Managed by Valyu Platform
                     </p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                {subscription.tier === 'unlimited' ? (
-                  <>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">100 queries per month</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Download reports</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Priority support</span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Unlimited queries</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Download reports</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <span className="text-gray-700 dark:text-gray-300">Pay only $0.10 per query</span>
-                    </div>
-                  </>
-                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-700 dark:text-gray-300">Unlimited queries (credit-based)</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-700 dark:text-gray-300">Full tool access</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-700 dark:text-gray-300">Download reports</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-gray-700 dark:text-gray-300">Credits shared across your organization</span>
+                </div>
               </div>
             </div>
 
-            {/* Manage Subscription Button */}
+            {/* Manage Credits Button */}
             <div className="flex flex-col gap-3">
               <Button
-                onClick={() => window.open('https://polar.sh/dashboard', '_blank')}
+                onClick={handleManageCredits}
                 className="w-full"
-                variant="outline"
               >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                Manage Subscription on Polar
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Manage Credits on Valyu Platform
               </Button>
               <p className="text-xs text-center text-gray-500 dark:text-gray-400">
-                View billing history, update payment method, or cancel subscription
+                View balance, add credits, and manage your organization
               </p>
             </div>
           </div>
@@ -173,264 +106,85 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
     );
   }
 
-  // Show upgrade options for free users
+  // Show sign-in prompt for unauthenticated users
   return (
     <>
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="!max-w-md sm:!max-w-2xl md:!max-w-4xl !w-[96vw] sm:!w-[90vw] md:!w-[85vw] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="space-y-2 sm:space-y-3 pb-4 sm:pb-6">
-          <DialogTitle className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 text-center px-2">
-            Unlock Professional-Grade Biomedical Research
-          </DialogTitle>
-          <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-lg mx-auto px-2">
-            Access institutional-quality research tools that save hours of analysis time. Choose the plan that fits your workflow.
-          </p>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="!max-w-md sm:!max-w-2xl !w-[96vw] sm:!w-[90vw] bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="space-y-2 sm:space-y-3 pb-4 sm:pb-6">
+            <DialogTitle className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 text-center px-2">
+              Get Full Access with Valyu
+            </DialogTitle>
+            <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-lg mx-auto px-2">
+              Sign in with your Valyu account to unlock unlimited research powered by your organization&apos;s credits.
+            </p>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Value Props Banner */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
-            <div className="flex flex-col items-center text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              <Clock className="h-5 w-5 sm:h-6 sm:w-6 text-slate-700 dark:text-slate-400 mb-1.5" />
-              <p className="text-sm sm:text-xs font-semibold text-gray-900 dark:text-gray-100">Save 100+ hrs/month</p>
-              <p className="text-xs sm:text-[10px] text-gray-600 dark:text-gray-400">On research & analysis</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-slate-700 dark:text-slate-400 mb-1.5" />
-              <p className="text-sm sm:text-xs font-semibold text-gray-900 dark:text-gray-100">Instant insights</p>
-              <p className="text-xs sm:text-[10px] text-gray-600 dark:text-gray-400">From multiple sources</p>
-            </div>
-            <div className="flex flex-col items-center text-center p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-              <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-slate-700 dark:text-slate-400 mb-1.5" />
-              <p className="text-sm sm:text-xs font-semibold text-gray-900 dark:text-gray-100">Data accuracy</p>
-              <p className="text-xs sm:text-[10px] text-gray-600 dark:text-gray-400">Verified sources only</p>
-            </div>
-          </div>
-
-          {/* Hint for individuals vs enterprises */}
-          {process.env.NEXT_PUBLIC_APP_MODE !== 'development' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
-            <div className="text-center mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                <span className="font-medium">Individual plans below.</span> Need enterprise deployment? <button onClick={handleEnterpriseClick} className="text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 underline underline-offset-2 font-medium">Book a demo</button> to explore custom infrastructure for your organization.
-              </p>
-            </div>
-          )}
-
-          {/* Plans Grid */}
-          <div className={`grid gap-3 sm:gap-4 ${(process.env.NEXT_PUBLIC_APP_MODE === 'development' || process.env.NEXT_PUBLIC_ENTERPRISE !== 'true') ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3'}`}>
-            {/* Pay Per Use - For Occasional Users */}
-            <motion.div
-              className="relative group cursor-pointer"
-              whileHover={{ y: -4 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => handleUpgrade('pay_per_use')}
-            >
-              <div className="h-full border-2 border-blue-200 dark:border-blue-800 bg-white dark:bg-slate-900 rounded-xl p-6 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-xl transition-all duration-200 flex flex-col">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-600 dark:bg-blue-700 rounded-lg">
-                      <Zap className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Pay-As-You-Go</h3>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">Perfect for ad-hoc research</p>
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            {/* Benefits */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 bg-blue-600 dark:bg-blue-700 rounded-lg">
+                  <Zap className="h-5 w-5 text-white" />
                 </div>
-
-                {/* Features */}
-                <div className="space-y-3 mb-6 flex-1">
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Unlimited queries</span> – No daily caps</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Full tool access</span> – Biomedical data, charts, analysis</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Pay only $0.10 per research</span> – No subscription needed</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Download reports</span> – Export as PDF</p>
-                  </div>
-                </div>
-
-                {/* Pricing */}
-                <div className="pt-4 border-t border-gray-100 dark:border-gray-800">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-2xl font-bold text-gray-900 dark:text-gray-100">$0.10</span>
-                    <span className="text-gray-500 dark:text-gray-400">/research</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">No monthly commitment required</p>
-
-                  <button className="w-full min-h-12 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group text-sm sm:text-base">
-                    <span className="hidden sm:inline">Start with Pay-As-You-Go</span>
-                    <span className="sm:hidden">Pay-As-You-Go</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Subscription - For Regular Users */}
-            <motion.div
-              className="relative group cursor-pointer"
-              whileHover={{ y: -4 }}
-              transition={{ duration: 0.2 }}
-              onClick={() => handleUpgrade('subscription')}
-            >
-              {/* Popular Badge */}
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-emerald-600 dark:bg-emerald-700 text-white text-xs font-semibold rounded-full flex items-center gap-1 shadow-lg">
-                <Crown className="h-3 w-3" />
-                <span>Most Popular</span>
+                <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Why Sign In?</h3>
               </div>
 
-              <div className="h-full border-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-6 hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-2xl transition-all duration-200 flex flex-col">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-600 dark:bg-emerald-700 rounded-lg">
-                      <Sparkles className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Subscription</h3>
-                      <p className="text-xs text-emerald-700 dark:text-emerald-400">For regular researchers</p>
-                    </div>
-                  </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Unlimited queries</span> - No daily limits</p>
                 </div>
-
-                {/* Features */}
-                <div className="space-y-3 mb-6 flex-1">
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">100 queries per month</span> – Renews monthly</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Fixed monthly cost</span> – No surprise bills</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Priority support</span> – Dedicated assistance</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Full tool access</span> – All features included</p>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Best value</span> – Just $0.10 per research</p>
-                  </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Use your existing credits</span> - From your Valyu organization</p>
                 </div>
-
-                {/* Pricing */}
-                <div className="pt-4 border-t border-emerald-100 dark:border-emerald-900/30">
-                  <div className="flex items-baseline gap-2 mb-1">
-                    <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">$10</span>
-                    <span className="text-gray-500 dark:text-gray-400">/month</span>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">100 queries included (~$0.10 each)</p>
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium mb-4">🎉 3 day free trial</p>
-
-                  <button className="w-full min-h-12 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group shadow-lg text-sm sm:text-base">
-                    <span>Start Free Trial</span>
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Single sign-on</span> - Works across all Valyu apps</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Save your research</span> - Access history and reports</p>
                 </div>
               </div>
-            </motion.div>
+            </div>
 
-            {/* Enterprise - For Teams */}
+            {/* Enterprise Option */}
             {process.env.NEXT_PUBLIC_APP_MODE !== 'development' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
               <motion.div
                 className="relative group cursor-pointer"
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -2 }}
                 transition={{ duration: 0.2 }}
                 onClick={handleEnterpriseClick}
               >
-                <div className="h-full border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-6 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-xl transition-all duration-200 flex flex-col">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2.5 bg-slate-200 dark:bg-slate-700 rounded-lg">
-                        <Building2 className="h-5 w-5 text-slate-700 dark:text-slate-300" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg text-gray-900 dark:text-gray-100">Enterprise</h3>
-                        <p className="text-xs text-gray-600 dark:text-gray-400">For organizations</p>
-                      </div>
+                <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-slate-200 dark:bg-slate-700 rounded-lg">
+                      <Building2 className="h-4 w-4 text-slate-700 dark:text-slate-300" />
                     </div>
-                  </div>
-
-                  {/* Features */}
-                  <div className="space-y-3 mb-6 flex-1">
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Everything in Pro Unlimited</span>, plus:</p>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">Need Enterprise?</h3>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Custom deployment for your organization</p>
                     </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Custom data integrations</span></p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">Tailored AI agents & workflows</span></p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">On-premise or cloud deployment</span></p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">White-label capabilities</span></p>
-                    </div>
-                    <div className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700 dark:text-gray-300"><span className="font-medium">& much more tailored to your needs</span></p>
-                    </div>
-                  </div>
-
-                  {/* Pricing */}
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <div className="flex items-baseline gap-2 mb-1">
-                      <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">Custom</span>
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Built specifically for your organization</p>
-
-                    <button className="w-full bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 text-white font-semibold py-2.5 px-4 rounded-lg transition-all duration-200 flex items-center justify-center gap-2 group">
-                      <span>Book a Demo</span>
-                      <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </button>
+                    <ExternalLink className="h-4 w-4 text-gray-400" />
                   </div>
                 </div>
               </motion.div>
             )}
-          </div>
 
-          {/* Trust Signals */}
-          <div className="flex items-center justify-center gap-6 pt-4 text-xs text-gray-500 dark:text-gray-400 border-t border-gray-200/50 dark:border-gray-700/50">
-            <div className="flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5" />
-              <span>Secure checkout via Polar</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Check className="h-3.5 w-3.5" />
-              <span>Cancel anytime</span>
-            </div>
+            {/* Info text */}
+            <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+              Don&apos;t have a Valyu account? <a href="https://platform.valyu.ai" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">Create one for free</a>
+            </p>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
 
-    {/* Enterprise modal rendered outside to prevent state loss */}
-    <EnterpriseContactModal
-      open={showEnterpriseModal}
-      onClose={() => setShowEnterpriseModal(false)}
-    />
+      <EnterpriseContactModal
+        open={showEnterpriseModal}
+        onClose={() => setShowEnterpriseModal(false)}
+      />
     </>
   );
 }

@@ -9,27 +9,20 @@ import { useQueryClient } from '@tanstack/react-query';
 import Image from 'next/image';
 import { Globe, GlobeTheme } from '@/components/globe';
 import { HistoryResearchInterface } from '@/components/history-research-interface';
-import { RateLimitDialog } from '@/components/rate-limit-dialog';
-import { useRateLimit } from '@/lib/hooks/use-rate-limit';
 import { AuthModal } from '@/components/auth/auth-modal';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
 import { Sidebar } from '@/components/sidebar';
 import BottomBar from '@/components/bottom-bar';
-import { SignupPrompt } from '@/components/signup-prompt';
 import { ResearchConfirmationDialog } from '@/components/research-confirmation-dialog';
 import { SettingsModal } from '@/components/user/settings-modal';
 import { SubscriptionModal } from '@/components/user/subscription-modal';
 
 function HomeContent() {
-  const { user, loading } = useAuthStore();
+  const { user, valyuAccessToken, loading } = useAuthStore();
   const queryClient = useQueryClient();
-  const { allowed, remaining, resetTime, increment, refresh } = useRateLimit();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [showRateLimitDialog, setShowRateLimitDialog] = useState(false);
-  const [rateLimitResetTime, setRateLimitResetTime] = useState(new Date());
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [pendingLocation, setPendingLocation] = useState<{ name: string; lat: number; lng: number; taskId?: string } | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
@@ -42,11 +35,9 @@ function HomeContent() {
   const [showMobileSubscription, setShowMobileSubscription] = useState(false);
   const [showMobileHistory, setShowMobileHistory] = useState(false);
 
-  // Handle rate limit errors
-  const handleRateLimitError = useCallback((resetTime: string) => {
-    setRateLimitResetTime(new Date(resetTime));
-    setShowRateLimitDialog(true);
-  }, []);
+  // Check if user is signed in with Valyu
+  const isSignedIn = !!user && !!valyuAccessToken;
+  const isDevelopment = process.env.NEXT_PUBLIC_APP_MODE === 'development';
 
   // Handle URL messages from auth callbacks
   useEffect(() => {
@@ -83,36 +74,10 @@ function HomeContent() {
     }
   }, [notification]);
 
-  // Helper to check anonymous rate limit from cookie directly
-  const checkAnonymousRateLimit = () => {
-    const COOKIE_NAME = '$dekcuf_teg';
-    const ANONYMOUS_LIMIT = 1;
-
-    const getCookie = (name: string): string | null => {
-      if (typeof window === 'undefined') return null;
-      const value = `; ${document.cookie}`;
-      const parts = value.split(`; ${name}=`);
-      return parts.length === 2 ? parts.pop()?.split(';').shift() || null : null;
-    };
-
-    const decodeCookieData = (encoded: string | null): number => {
-      if (!encoded) return 0;
-      try {
-        const decoded = atob(encoded);
-        return parseInt(decoded) || 0;
-      } catch {
-        return 0;
-      }
-    };
-
-    const used = decodeCookieData(getCookie(COOKIE_NAME));
-    return used < ANONYMOUS_LIMIT;
-  };
-
   const handleLocationClick = useCallback(async (location: { name: string; lat: number; lng: number }, taskId?: string) => {
     track('location_clicked', { location: location.name });
 
-    // If this is loading existing research (has taskId), skip rate limit check
+    // If this is loading existing research (has taskId), allow it
     if (taskId) {
       setSelectedLocation(location);
       const params = new URLSearchParams(window.location.search);
@@ -121,38 +86,23 @@ function HomeContent() {
       return;
     }
 
-    // For anonymous users, check cookie directly for real-time rate limit
-    const isRateLimitOk = !user ? checkAnonymousRateLimit() : allowed;
-
-    // Check rate limit for ALL users (anonymous and signed-in)
-    if (!isRateLimitOk) {
-      // For anonymous users, show signup prompt with rate limit context
-      if (!user) {
-        setShowSignupPrompt(true);
-        return;
-      }
-      // For signed-in users, show rate limit error
-      handleRateLimitError(resetTime?.toISOString() || new Date().toISOString());
+    // Require Valyu sign-in (except in development mode)
+    if (!isDevelopment && !isSignedIn) {
+      setShowAuthModal(true);
       return;
     }
 
-    // Rate limit OK - show confirmation dialog
+    // Show confirmation dialog
     setConfirmLocation(location);
     setShowConfirmDialog(true);
-  }, [allowed, user, resetTime, handleRateLimitError]);
+  }, [isSignedIn, isDevelopment]);
 
   const handleConfirmResearch = useCallback((instructions?: string) => {
     if (confirmLocation) {
-      // Double-check rate limit before starting research
-      const isRateLimitOk = !user ? checkAnonymousRateLimit() : allowed;
-
-      if (!isRateLimitOk) {
+      // Double-check sign-in before starting research
+      if (!isDevelopment && !isSignedIn) {
         setShowConfirmDialog(false);
-        if (!user) {
-          setShowSignupPrompt(true);
-        } else {
-          handleRateLimitError(resetTime?.toISOString() || new Date().toISOString());
-        }
+        setShowAuthModal(true);
         return;
       }
 
@@ -161,7 +111,7 @@ function HomeContent() {
       setShowConfirmDialog(false);
       setConfirmLocation(null);
     }
-  }, [confirmLocation, allowed, user, resetTime, handleRateLimitError]);
+  }, [confirmLocation, isSignedIn, isDevelopment]);
 
   const handleCancelResearch = useCallback(() => {
     setShowConfirmDialog(false);
@@ -232,22 +182,16 @@ function HomeContent() {
   }, []);
 
   const handleFeelingLucky = useCallback(() => {
-    // Check if user is signed in - BLOCK with signup prompt
-    if (!user) {
-      setShowSignupPrompt(true);
-      return;
-    }
-
-    // Check rate limit for signed-in users
-    if (!allowed) {
-      handleRateLimitError(resetTime?.toISOString() || new Date().toISOString());
+    // Require Valyu sign-in (except in development mode)
+    if (!isDevelopment && !isSignedIn) {
+      setShowAuthModal(true);
       return;
     }
 
     if (globeRef.current) {
       globeRef.current.selectRandomLocation();
     }
-  }, [allowed, user, resetTime, handleRateLimitError]);
+  }, [isSignedIn, isDevelopment]);
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
@@ -379,27 +323,6 @@ function HomeContent() {
         />
       )}
 
-      <SignupPrompt
-        open={showSignupPrompt}
-        onClose={() => {
-          setShowSignupPrompt(false);
-          // Continue without account - proceed with pending location
-          if (pendingLocation) {
-            setSelectedLocation(pendingLocation);
-            if (pendingLocation.taskId) {
-              const params = new URLSearchParams(window.location.search);
-              params.set('research', pendingLocation.taskId);
-              window.history.pushState({}, '', `?${params.toString()}`);
-            }
-            setPendingLocation(null);
-          }
-        }}
-        onSignUp={() => {
-          setShowSignupPrompt(false);
-          setShowAuthModal(true);
-        }}
-      />
-
       <AuthModal
         open={showAuthModal}
         onClose={() => setShowAuthModal(false)}
@@ -418,12 +341,6 @@ function HomeContent() {
       <SubscriptionModal
         open={showMobileSubscription}
         onClose={() => setShowMobileSubscription(false)}
-      />
-
-      <RateLimitDialog
-        open={showRateLimitDialog}
-        onOpenChange={setShowRateLimitDialog}
-        resetTime={rateLimitResetTime}
       />
 
       {/* Notifications */}

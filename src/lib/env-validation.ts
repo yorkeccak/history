@@ -1,4 +1,4 @@
-// Environment variable validation for critical payment and billing systems
+// Environment variable validation for Valyu OAuth and critical systems
 
 interface EnvValidationResult {
   valid: boolean;
@@ -9,7 +9,7 @@ interface EnvValidationResult {
 export function validatePaymentEnvironment(): EnvValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
-  
+
   const isDevelopment = process.env.NODE_ENV === 'development';
   const isProduction = !isDevelopment;
 
@@ -26,34 +26,22 @@ export function validatePaymentEnvironment(): EnvValidationResult {
 
   // Production-only requirements
   if (isProduction) {
-    // Polar requirements
-    if (!process.env.POLAR_ACCESS_TOKEN) {
-      errors.push('POLAR_ACCESS_TOKEN is required in production');
+    // Valyu OAuth requirements
+    if (!process.env.NEXT_PUBLIC_VALYU_SUPABASE_URL) {
+      errors.push('NEXT_PUBLIC_VALYU_SUPABASE_URL is required in production');
     }
-    if (!process.env.POLAR_WEBHOOK_SECRET) {
-      errors.push('POLAR_WEBHOOK_SECRET is required in production');
+    if (!process.env.NEXT_PUBLIC_VALYU_CLIENT_ID) {
+      errors.push('NEXT_PUBLIC_VALYU_CLIENT_ID is required in production');
     }
-    if (!process.env.POLAR_SUBSCRIPTION_PRODUCT_ID) {
-      errors.push('POLAR_SUBSCRIPTION_PRODUCT_ID is required in production');
+    if (!process.env.VALYU_CLIENT_SECRET) {
+      errors.push('VALYU_CLIENT_SECRET is required in production');
     }
-    if (!process.env.POLAR_PAY_PER_USE_PRODUCT_ID) {
-      errors.push('POLAR_PAY_PER_USE_PRODUCT_ID is required in production');
-    }
-    
-    // API keys for usage tracking
-    if (!process.env.VALYU_API_KEY) {
-      warnings.push('VALYU_API_KEY missing - history research will fail');
-    }
-    // DAYTONA_API_KEY and OPENAI_API_KEY are optional - not used in this app
   }
 
   // Development warnings
   if (isDevelopment) {
-    if (!process.env.POLAR_ACCESS_TOKEN) {
-      warnings.push('POLAR_ACCESS_TOKEN missing - payment testing will be limited');
-    }
-    if (!process.env.POLAR_PAY_PER_USE_PRODUCT_ID) {
-      warnings.push('POLAR_PAY_PER_USE_PRODUCT_ID missing - cannot test pay-per-use flow');
+    if (!process.env.VALYU_API_KEY) {
+      warnings.push('VALYU_API_KEY missing - API calls will fail without OAuth token');
     }
   }
 
@@ -72,12 +60,15 @@ export function validatePaymentEnvironment(): EnvValidationResult {
 export function logEnvironmentStatus(): void {
   const validation = validatePaymentEnvironment();
   const isDevelopment = process.env.NODE_ENV === 'development';
-  
+
   if (validation.valid) {
+    // Environment is properly configured
   } else {
+    // Environment has issues
   }
-  
+
   if (validation.warnings.length > 0) {
+    // Warnings present
   }
 }
 

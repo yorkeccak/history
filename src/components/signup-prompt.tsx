@@ -2,28 +2,16 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { X, Sparkles, History, CreditCard, TrendingUp } from 'lucide-react';
-import { useAuthStore } from '@/lib/stores/use-auth-store';
-import { useSubscription } from '@/hooks/use-subscription';
+import { X, Sparkles, History, Gift } from 'lucide-react';
+import Image from 'next/image';
 
 interface SignupPromptProps {
   open: boolean;
   onClose: () => void;
   onSignUp: () => void;
-  rateLimitContext?: 'anonymous' | 'free' | 'subscription' | null;
 }
 
-export function SignupPrompt({ open, onClose, onSignUp, rateLimitContext }: SignupPromptProps) {
-  const user = useAuthStore((state) => state.user);
-  const subscription = useSubscription();
-
-  // Determine the context
-  const isAnonymous = !user;
-  const isFreeUser = user && subscription.tier === 'free';
-  const isSubscriptionUser = subscription.tier === 'unlimited';
-
-  // Use rateLimitContext if provided, otherwise infer from user state
-  const context = rateLimitContext || (isAnonymous ? 'anonymous' : isFreeUser ? 'free' : isSubscriptionUser ? 'unlimited' : null);
+export function SignupPrompt({ open, onClose, onSignUp }: SignupPromptProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -65,147 +53,76 @@ export function SignupPrompt({ open, onClose, onSignUp, rateLimitContext }: Sign
 
                 {/* Title */}
                 <h2 className="text-lg sm:text-2xl font-semibold text-center mb-2 text-foreground px-2">
-                  {context === 'anonymous' && 'Free Query Used'}
-                  {context === 'free' && 'Daily Queries Used'}
-                  {context === 'subscription' && 'Monthly Queries Used'}
-                  {!context && 'Unlock the Full Experience'}
+                  Sign in to Continue
                 </h2>
 
                 {/* Subtitle */}
                 <p className="text-center text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 px-2">
-                  {context === 'anonymous' && 'Sign up to get 3 free queries per day!'}
-                  {context === 'free' && 'Subscribe to a plan for more queries'}
-                  {context === 'subscription' && 'You\'ve used all 100 monthly queries. Upgrade to pay-per-use for unlimited access.'}
-                  {!context && 'Sign up to save your research and explore unlimited locations.'}
+                  Sign in with Valyu to run deep research queries
                 </p>
+
+                {/* Free Credits Badge */}
+                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4 mb-6">
+                  <div className="flex items-center justify-center gap-2 mb-1">
+                    <Gift className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <span className="text-green-600 dark:text-green-400 font-bold">$10 Free Credits</span>
+                  </div>
+                  <p className="text-center text-xs text-muted-foreground">
+                    New accounts get $10 in free search credits
+                  </p>
+                </div>
 
                 {/* Features */}
                 <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                  {context === 'anonymous' && (
-                    <>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            3 Free Queries Per Day
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Create an account to get 3 deep research queries every day, completely free!
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            Save Your Research
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Access your research history anytime, anywhere.
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {(context === 'free' || context === 'subscription') && (
-                    <>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <CreditCard className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            {context === 'subscription' ? 'Pay-Per-Use Plan' : 'Subscription Plan'}
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            {context === 'subscription'
-                              ? '$0.10 per query - unlimited access, only pay for what you use'
-                              : '$10/month for 100 queries (~$0.10 each) with 3 day free trial'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            Professional Research
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Access advanced AI models and priority processing
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {!context && (
-                    <>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            Save Your Research History
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Never lose your discoveries. Access all research anytime.
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-2 sm:gap-3">
-                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
-                          <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-xs sm:text-sm text-foreground">
-                            More Queries
-                          </h3>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Free accounts get 3 queries per day. Upgrade for more access.
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
+                      <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-xs sm:text-sm text-foreground">
+                        Unlimited Deep Research
+                      </h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        Run as many queries as you need with your Valyu credits
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2 sm:gap-3">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0 border border-border">
+                      <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="font-semibold text-xs sm:text-sm text-foreground">
+                        Save Your Research
+                      </h3>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground">
+                        Access your research history anytime, anywhere
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                {/* CTA Buttons */}
-                <div className="space-y-2 sm:space-y-3">
-                  <Button
-                    onClick={onSignUp}
-                    size="lg"
-                    className="w-full min-h-11 sm:min-h-12 text-sm sm:text-base bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-                  >
-                    {context === 'anonymous' && 'Create Free Account'}
-                    {(context === 'free' || context === 'subscription') && 'View Plans'}
-                    {!context && 'Create Free Account'}
-                  </Button>
-                  {!context && (
-                    <Button
-                      onClick={onClose}
-                      variant="ghost"
-                      size="lg"
-                      className="w-full min-h-11 sm:min-h-12 text-sm sm:text-base"
-                    >
-                      Continue Without Account
-                    </Button>
-                  )}
-                </div>
+                {/* CTA Button */}
+                <Button
+                  onClick={onSignUp}
+                  size="lg"
+                  className="w-full min-h-11 sm:min-h-12 text-sm sm:text-base bg-black hover:bg-gray-800 text-white font-medium"
+                >
+                  <span className="flex items-center justify-center gap-3">
+                    <span>Sign in with</span>
+                    <Image
+                      src="/valyu.svg"
+                      alt="Valyu"
+                      width={60}
+                      height={20}
+                      className="h-5 w-auto invert"
+                    />
+                  </span>
+                </Button>
 
                 {/* Note */}
                 <p className="text-center text-[10px] sm:text-xs text-muted-foreground mt-3 sm:mt-4">
-                  {context === 'anonymous' && 'Takes less than 30 seconds. No credit card required.'}
-                  {context === 'free' && 'Reset at midnight. Subscribe for more queries now.'}
-                  {context === 'subscription' && 'Resets on the 1st of each month.'}
-                  {!context && 'Takes less than 30 seconds. No credit card required.'}
+                  Super frictionless. Create an account in seconds.
                 </p>
               </div>
             </div>

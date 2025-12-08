@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
 import {
   Dialog,
@@ -8,8 +8,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { FaGoogle } from 'react-icons/fa';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import Image from 'next/image';
+import { track } from '@vercel/analytics';
 
 interface AuthModalProps {
   open: boolean;
@@ -17,249 +18,125 @@ interface AuthModalProps {
   onSignUpSuccess?: (message: string) => void;
 }
 
-export function AuthModal({ open, onClose, onSignUpSuccess }: AuthModalProps) {
-  const signIn = useAuthStore((state) => state.signIn);
-  const signUp = useAuthStore((state) => state.signUp);
-  const signInWithGoogle = useAuthStore((state) => state.signInWithGoogle);
+export function AuthModal({ open, onClose }: AuthModalProps) {
+  const signInWithValyu = useAuthStore((state) => state.signInWithValyu);
   const authLoading = useAuthStore((state) => state.loading);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
 
-  const [authData, setAuthData] = useState({
-    email: '',
-    password: ''
-  });
+  // Track when auth modal is shown
+  useEffect(() => {
+    if (open) {
+      track('Auth Modal Shown', {
+        source: 'prompt_submit',
+      });
+    }
+  }, [open]);
 
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleValyuSignIn = async () => {
     setLoading(true);
     setError(null);
 
-    try {
-      // First, check if user exists by trying to sign in with a dummy request
-      // We'll use the actual password they provided
-      const { error: signInError } = await signIn(authData.email, authData.password);
-
-      if (signInError) {
-        // Email not confirmed - user exists but hasn't verified
-        if (signInError.message.includes('Email not confirmed')) {
-          setError('Please check your inbox and confirm your email first.');
-          setLoading(false);
-          return;
-        }
-
-        // Invalid credentials could mean: user exists with wrong password, OR user doesn't exist
-        // We need to check if the user actually exists
-        if (signInError.message.includes('Invalid login credentials')) {
-          // Try a password reset request to check if email exists
-          // This won't actually send an email, just checks if user exists
-          const supabase = (await import('@/utils/supabase/client')).createClient();
-
-          // Check if user exists by attempting signup - but check the response carefully
-          const { data: signUpData, error: signUpError } = await signUp(authData.email, authData.password);
-
-          // If signup returns a user but with identities = [], it means user already exists
-          // Supabase doesn't send confirmation email again for existing users
-          if (signUpData?.user && (!signUpData.user.identities || signUpData.user.identities.length === 0)) {
-            // User exists, wrong password
-            setError('Incorrect email or password.');
-          } else if (signUpError) {
-            // Signup failed for some other reason
-            setError('Incorrect email or password.');
-          } else if (signUpData?.user && signUpData.user.identities && signUpData.user.identities.length > 0) {
-            // New user created successfully
-            setUserEmail(authData.email);
-            setShowSuccess(true);
-            onSignUpSuccess?.('Check your email to confirm your account!');
-          } else {
-            // Unexpected case
-            setError('Incorrect email or password.');
-          }
-        } else {
-          // Other sign-in errors
-          setError(signInError.message);
-        }
-      } else {
-        // Sign in successful
-        onClose();
-      }
-    } catch (err) {
-      setError('An unexpected error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setGoogleLoading(true);
-    setError(null);
+    // Track sign in button click
+    track('Valyu Sign In Clicked', {
+      step: 'initiate',
+    });
 
     try {
-      const { error } = await signInWithGoogle();
+      const { error } = await signInWithValyu();
       if (error) {
-        setError(error.message);
-        setGoogleLoading(false);
+        setError(error.message || 'Failed to initiate sign in');
+        setLoading(false);
+        // Track sign in error
+        track('Valyu Sign In Error', {
+          step: 'initiate',
+          error: error.message || 'Failed to initiate sign in',
+        });
       }
       // Don't close here as OAuth will redirect
-      // Don't set googleLoading false here as user will be redirected
+      // Don't set loading false here as user will be redirected
     } catch (err) {
       setError('An unexpected error occurred');
-      setGoogleLoading(false);
+      setLoading(false);
+      // Track unexpected error
+      track('Valyu Sign In Error', {
+        step: 'initiate',
+        error: 'unexpected_error',
+      });
     }
   };
 
   const isLoading = loading || authLoading;
 
   const handleClose = () => {
-    setShowSuccess(false);
+    // Track modal dismissed without signing in
+    track('Auth Modal Dismissed', {
+      had_error: !!error,
+    });
     setError(null);
-    setAuthData({ email: '', password: '' });
     onClose();
   };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-xs w-[90vw] border-0 shadow-2xl bg-card p-4 sm:p-8">
-        <DialogHeader className="text-center pb-4 sm:pb-6">
-          <DialogTitle className="text-lg sm:text-xl font-normal text-card-foreground">
-            History.
-          </DialogTitle>
+      <DialogContent className="sm:max-w-[450px]">
+        <DialogHeader>
+          <DialogTitle className="text-center text-xl">Sign in with Valyu</DialogTitle>
         </DialogHeader>
 
-        {/* Success Message */}
-        {showSuccess ? (
-          <div className="space-y-4 sm:space-y-6 text-center py-4 sm:py-8">
-            <div className="mx-auto w-12 h-12 sm:w-16 sm:h-16 bg-green-500/10 rounded-full flex items-center justify-center">
-              <svg
-                className="w-6 h-6 sm:w-8 sm:h-8 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base sm:text-lg font-medium text-foreground mb-2">
-                Check your inbox
-              </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                We sent a confirmation email to
-              </p>
-              <p className="text-xs sm:text-sm font-medium text-foreground mt-1 break-all px-2">
-                {userEmail}
-              </p>
-            </div>
-            <button
-              onClick={handleClose}
-              className="w-full min-h-11 p-2.5 sm:p-3 text-sm sm:text-base bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {/* Unified Auth Form */}
-            <form onSubmit={handleAuth} className="space-y-3 sm:space-y-4">
-            <input
-              type="email"
-              placeholder="Email"
-              value={authData.email}
-              onChange={(e) => setAuthData(prev => ({ ...prev, email: e.target.value }))}
-              required
-              className="w-full p-2.5 sm:p-3 text-sm sm:text-base border-0 border-b border-border bg-transparent focus:border-foreground focus:outline-none transition-colors placeholder:text-muted-foreground text-foreground"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={authData.password}
-              onChange={(e) => setAuthData(prev => ({ ...prev, password: e.target.value }))}
-              required
-              className="w-full p-2.5 sm:p-3 text-sm sm:text-base border-0 border-b border-border bg-transparent focus:border-foreground focus:outline-none transition-colors placeholder:text-muted-foreground text-foreground"
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full min-h-11 p-2.5 sm:p-3 mt-4 sm:mt-6 text-sm sm:text-base bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors disabled:opacity-50"
-            >
-              {isLoading ? 'Please wait...' : 'Continue'}
-            </button>
-          </form>
+        <div className="space-y-5 py-4">
+          <p className="text-center text-sm text-muted-foreground leading-relaxed">
+            Valyu is the information backbone of History, giving our AI engine access to real-time data across web, academic, and proprietary sources.
+          </p>
 
-          {/* Divider with better text */}
-          <div className="relative text-center py-3 sm:py-4">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-border"></div>
+          {/* Free Credits Badge */}
+          <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <span className="text-xl">🎁</span>
+              <span className="text-green-600 dark:text-green-400 font-bold">$10 Free Credits</span>
             </div>
-            <div className="relative flex justify-center">
-              <span className="bg-card px-2 sm:px-3 text-[10px] sm:text-xs text-muted-foreground">
-                or continue with
-              </span>
-            </div>
+            <p className="text-center text-xs text-muted-foreground">
+              New accounts get $10 in free search credits
+            </p>
           </div>
 
-          {/* Google Sign In Button */}
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={handleGoogleSignIn}
-            disabled={isLoading || googleLoading}
-            className="w-full min-h-11 p-2.5 sm:p-3 border border-border rounded-md hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            </div>
+          )}
+
+          <Button
+            onClick={handleValyuSignIn}
+            disabled={isLoading}
+            className="w-full h-12 bg-black hover:bg-gray-800 text-white font-medium"
           >
-            <AnimatePresence mode="wait">
-              {googleLoading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-center gap-2"
-                >
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  >
-                    <FaGoogle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  </motion.div>
-                  <span className="text-xs sm:text-sm text-foreground">Connecting...</span>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="normal"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex items-center justify-center gap-2"
-                >
-                  <FaGoogle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  <span className="text-xs sm:text-sm text-foreground">Google</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.button>
-
-          {/* Error Display */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-center text-xs sm:text-sm text-red-600"
-              >
-                {error}
-              </motion.div>
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Connecting...
+              </span>
+            ) : (
+              <span className="flex items-center justify-center gap-3">
+                <span>Sign in with</span>
+                <Image
+                  src="/valyu.svg"
+                  alt="Valyu"
+                  width={60}
+                  height={20}
+                  className="h-5 w-auto invert"
+                />
+              </span>
             )}
-          </AnimatePresence>
-          </div>
-        )}
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground">
+            Don&apos;t have an account? You can create one during sign-in.
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   );

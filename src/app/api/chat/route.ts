@@ -1,111 +1,124 @@
-import { checkAnonymousRateLimit, incrementRateLimit } from "@/lib/rate-limit";
-import { checkUserRateLimit } from '@/lib/rate-limit';
-import { validateAccess } from '@/lib/polar-access-validation';
-import { PolarEventTracker } from '@/lib/polar-events';
 import * as db from '@/lib/db';
 import { isDevelopmentMode } from '@/lib/local-db/local-auth';
 import { saveChatMessages } from '@/lib/db';
 
 // Vercel Pro plan allows up to 800s (13.3 minutes)
-// For longer tasks, we need to use polling pattern
 export const maxDuration = 800;
 
-// DeepResearch API configuration
+// Valyu OAuth Proxy configuration - uses /deepresearch endpoint
+const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
+const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
+
+// Fallback for development mode only
+const VALYU_API_KEY = process.env.VALYU_API_KEY;
 const DEEPRESEARCH_API_URL = 'https://api.valyu.ai/v1/deepresearch';
-const DEEPRESEARCH_API_KEY = process.env.VALYU_API_KEY;
 
 interface DeepResearchMessage {
   role: 'user' | 'assistant';
   content: string | any[];
 }
 
+/**
+ * Make a DeepResearch API call via Valyu OAuth Proxy
+ * Credits are handled by Valyu Platform
+ */
+async function callDeepResearchApi(
+  body: any,
+  valyuAccessToken: string
+): Promise<Response> {
+  const response = await fetch(VALYU_OAUTH_PROXY_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${valyuAccessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      path: '/v1/deepresearch/tasks',
+      method: 'POST',
+      body,
+    }),
+  });
+  return response;
+}
+
+/**
+ * Fallback for development mode - direct API call
+ */
+async function callDeepResearchApiDev(body: any): Promise<Response> {
+  const response = await fetch(`${DEEPRESEARCH_API_URL}/tasks`, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': VALYU_API_KEY!,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  return response;
+}
+
+/**
+ * Get task status from DeepResearch API
+ */
+async function getTaskStatus(taskId: string, valyuAccessToken?: string): Promise<Response> {
+  if (valyuAccessToken) {
+    const response = await fetch(VALYU_OAUTH_PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${valyuAccessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        path: `/v1/deepresearch/tasks/${taskId}/status`,
+        method: 'GET',
+      }),
+    });
+    return response;
+  } else {
+    // Dev mode fallback
+    const response = await fetch(
+      `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
+      {
+        headers: {
+          'X-API-Key': VALYU_API_KEY!,
+        },
+      }
+    );
+    return response;
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const { messages, sessionId, location }: {
+    const { messages, sessionId, location, valyuAccessToken }: {
       messages: DeepResearchMessage[],
       sessionId?: string,
-      location?: { name: string; lat: number; lng: number }
+      location?: { name: string; lat: number; lng: number },
+      valyuAccessToken?: string
     } = await req.json();
 
-
-    // Determine if this is a user-initiated message (should count towards rate limit)
     const lastMessage = messages[messages.length - 1];
-    const isUserMessage = lastMessage?.role === 'user';
-    const userMessageCount = messages.filter(m => m.role === 'user').length;
-    const isUserInitiated = isUserMessage && userMessageCount === 1;
-
-
-    // Check app mode and configure accordingly
     const isDevelopment = isDevelopmentMode();
 
-    // Get authenticated user
+    // REQUIRE Valyu sign-in for all queries (except dev mode)
+    if (!isDevelopment && !valyuAccessToken) {
+      return new Response(
+        JSON.stringify({
+          error: "AUTH_REQUIRED",
+          message: "Sign in with Valyu to continue",
+          action: "sign_in"
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get authenticated user (for saving to database)
     const { data: { user } } = await db.getUser();
-
-    // Validate access for authenticated users
-    if (user && !isDevelopment) {
-      const accessValidation = await validateAccess(user.id);
-
-      if (!accessValidation.hasAccess && accessValidation.requiresPaymentSetup) {
-        return new Response(
-          JSON.stringify({
-            error: "PAYMENT_REQUIRED",
-            message: "Payment method setup required",
-            tier: accessValidation.tier,
-            action: "setup_payment"
-          }),
-          { status: 402, headers: { 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    // Check rate limit for user-initiated messages
-    if (isUserInitiated && !isDevelopment) {
-      if (!user) {
-        const cookieHeader = req.headers.get('cookie') || '';
-        const rateLimitStatus = await checkAnonymousRateLimit(cookieHeader);
-
-        if (!rateLimitStatus.allowed) {
-          return new Response(
-            JSON.stringify({
-              error: "RATE_LIMIT_EXCEEDED",
-              message: "You have used your free query. Sign up to get 3 queries per day for free!",
-              resetTime: rateLimitStatus.resetTime.toISOString(),
-              remaining: rateLimitStatus.remaining,
-            }),
-            {
-              status: 429,
-              headers: {
-                "Content-Type": "application/json",
-                "X-RateLimit-Limit": rateLimitStatus.limit.toString(),
-                "X-RateLimit-Remaining": rateLimitStatus.remaining.toString(),
-                "X-RateLimit-Reset": rateLimitStatus.resetTime.toISOString(),
-              },
-            }
-          );
-        }
-      } else {
-        const rateLimitResult = await checkUserRateLimit(user.id);
-
-        if (!rateLimitResult.allowed) {
-          return new Response(JSON.stringify({
-            error: "RATE_LIMIT_EXCEEDED",
-            message: "Daily query limit reached. Upgrade to continue.",
-            resetTime: rateLimitResult.resetTime.toISOString(),
-            tier: rateLimitResult.tier
-          }), {
-            status: 429,
-            headers: { "Content-Type": "application/json" }
-          });
-        }
-      }
-    }
 
     // Track processing start time
     const processingStartTime = Date.now();
 
     // Save user message immediately (before processing starts)
     if (user && sessionId && messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'user') {
         const { randomUUID } = await import('crypto');
         const userMessageToSave = {
@@ -130,11 +143,9 @@ export async function POST(req: Request) {
     }
 
     // Construct the research query
-    // Use the user's message content (which includes custom instructions or preset prompts)
     let researchQuery = typeof lastMessage.content === 'string' ? lastMessage.content : '';
 
-    // Only use default prompt if the message is ONLY the location name (no custom instructions)
-    // Check if the message just contains the location name (e.g., "Research the history of Russia")
+    // Use default prompt if message is just the location name
     const isDefaultMessage = location && (
       researchQuery === `Research the history of ${location.name}` ||
       researchQuery === location.name
@@ -144,77 +155,51 @@ export async function POST(req: Request) {
       researchQuery = `Provide a comprehensive historical overview of this location, covering major events, cultural significance, and key developments throughout history.\n\nLocation: ${location.name}`;
     }
 
-    // Get user tier for model selection
-    let userTier = 'free';
-    if (user) {
-      const { data: userData } = await db.getUserProfile(user.id);
-      userTier = userData?.subscription_tier || userData?.subscriptionTier || 'free';
-    }
-
-    // Select DeepResearch model based on tier
-    const model = userTier === 'unlimited' || userTier === 'pay_per_use' ? 'heavy' : 'lite';
-
-    // Create DeepResearch task
-    const taskResponse = await fetch(`${DEEPRESEARCH_API_URL}/tasks`, {
-      method: 'POST',
-      headers: {
-        'X-API-Key': DEEPRESEARCH_API_KEY!,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: researchQuery,
-        model: model,
-        output_formats: ['markdown'],
-        search: {
-          search_type: 'all',
-        },
-      }),
-    });
+    // Create DeepResearch task - always use 'lite' model (credits managed by Valyu)
+    const taskResponse = isDevelopment && !valyuAccessToken
+      ? await callDeepResearchApiDev({
+          input: researchQuery,
+          model: 'lite',
+          output_formats: ['markdown']
+        })
+      : await callDeepResearchApi({
+          input: researchQuery,
+          model: 'lite',
+          output_formats: ['markdown']
+        }, valyuAccessToken!);
 
     if (!taskResponse.ok) {
-      throw new Error(`DeepResearch API error: ${taskResponse.statusText}`);
+      const errorData = await taskResponse.json().catch(() => ({}));
+
+      // Handle Valyu credit errors
+      if (taskResponse.status === 402) {
+        return new Response(
+          JSON.stringify({
+            error: "INSUFFICIENT_CREDITS",
+            message: "Insufficient Valyu credits. Add credits at platform.valyu.ai",
+            action: "add_credits"
+          }),
+          { status: 402, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+
+      throw new Error(`DeepResearch API error: ${errorData.error || taskResponse.statusText}`);
     }
 
     const taskData = await taskResponse.json();
-    const taskId = taskData.deepresearch_id;
-
-    // Track usage for pay-per-use customers via Polar events
-    if (!isDevelopment && user) {
-      try {
-        // Get user tier to check if they're on pay-per-use plan
-        const { data: userData } = await db.getUserProfile(user.id);
-        const tier = userData?.subscription_tier || userData?.subscriptionTier || 'free';
-
-        if (tier === 'pay_per_use') {
-          const eventTracker = new PolarEventTracker();
-          await eventTracker.trackDeepResearch(
-            user.id,
-            taskId,
-            location?.name || 'Unknown',
-            {
-              location_lat: location?.lat || 0,
-              location_lng: location?.lng || 0,
-              model: model
-            }
-          );
-        }
-      } catch (error) {
-        // Don't fail the request if event tracking fails
-      }
-    }
+    const taskId = taskData.deepsearch_id || taskData.deepresearch_id;
 
     // Save research task to database
-    if (!isDevelopment) {
+    if (!isDevelopment && user) {
       try {
         const taskRecord = {
           id: crypto.randomUUID(),
-          user_id: user?.id,
+          user_id: user.id,
           deepresearch_id: taskId,
           location_name: location?.name || 'Unknown',
           location_lat: location?.lat || 0,
           location_lng: location?.lng || 0,
           status: 'queued',
-          anonymous_id: !user ? req.headers.get('x-anonymous-id') || undefined : undefined,
         };
 
         await db.createResearchTask(taskRecord);
@@ -230,7 +215,6 @@ export async function POST(req: Request) {
       const newMessages = messages.slice(lastLength);
       if (newMessages.length > 0) {
         for (const message of newMessages) {
-          // Stream assistant AND tool messages (tool messages contain tool-results with sources)
           if ((message.role === 'assistant' || message.role === 'tool') && message.content) {
             for (const contentItem of message.content) {
               controller.enqueue(
@@ -255,7 +239,7 @@ export async function POST(req: Request) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send task ID immediately so client can continue polling if needed
+          // Send task ID immediately
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
@@ -278,7 +262,7 @@ export async function POST(req: Request) {
 
           let completed = false;
           let pollCount = 0;
-          const maxPolls = 840; // 14 minutes at 1 second intervals
+          const maxPolls = 840; // 14 minutes
           let lastMessagesLength = 0;
           let hasSetRunning = false;
 
@@ -286,14 +270,7 @@ export async function POST(req: Request) {
             await new Promise(resolve => setTimeout(resolve, 1000));
             pollCount++;
 
-            const statusResponse = await fetch(
-              `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
-              {
-                headers: {
-                  'X-API-Key': DEEPRESEARCH_API_KEY!,
-                },
-              }
-            );
+            const statusResponse = await getTaskStatus(taskId, valyuAccessToken);
 
             if (!statusResponse.ok) {
               throw new Error('Failed to get task status');
@@ -302,7 +279,6 @@ export async function POST(req: Request) {
             const statusData = await statusResponse.json();
 
             if (statusData.status === 'running') {
-              // Update database status to running on first detection
               if (!isDevelopment && !hasSetRunning) {
                 hasSetRunning = true;
                 try {
@@ -314,32 +290,34 @@ export async function POST(req: Request) {
                 }
               }
 
+              // Progress info is in statusData.progress object
+              const progress = statusData.progress || {};
+              const currentStep = progress.current_step || progress.step || 0;
+              const totalSteps = progress.total_steps || progress.total || 10;
+              const progressMessage = progress.message || `Researching... (${currentStep}/${totalSteps} steps)`;
+
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
                     type: 'progress',
                     status: 'running',
-                    message: `Researching... (${statusData.current_step || 0}/${statusData.total_steps || 10} steps)`,
-                    current_step: statusData.current_step,
-                    total_steps: statusData.total_steps,
+                    message: progressMessage,
+                    current_step: currentStep,
+                    total_steps: totalSteps,
                   })}\n\n`
                 )
               );
 
-              // Stream new messages
               lastMessagesLength = streamMessages(controller, encoder, statusData.messages, lastMessagesLength);
             } else if (statusData.status === 'completed') {
               completed = true;
 
-              // Stream any remaining messages
               lastMessagesLength = streamMessages(controller, encoder, statusData.messages, lastMessagesLength);
 
-              // Stream the final output
               const output = statusData.output || '';
               const sources = statusData.sources || [];
               const images = statusData.images || [];
 
-              // Send the main content
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
@@ -349,7 +327,6 @@ export async function POST(req: Request) {
                 )
               );
 
-              // Send sources
               if (sources.length > 0) {
                 controller.enqueue(
                   encoder.encode(
@@ -361,7 +338,6 @@ export async function POST(req: Request) {
                 );
               }
 
-              // Send images
               if (images.length > 0) {
                 controller.enqueue(
                   encoder.encode(
@@ -401,7 +377,6 @@ export async function POST(req: Request) {
                 });
               }
 
-              // Update research task status in database
               if (!isDevelopment) {
                 try {
                   await db.updateResearchTaskByDeepResearchId(taskId, {
@@ -413,7 +388,6 @@ export async function POST(req: Request) {
                 }
               }
 
-              // Send completion signal
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
@@ -422,7 +396,6 @@ export async function POST(req: Request) {
                 )
               );
             } else if (statusData.status === 'failed') {
-              // Update research task status in database
               if (!isDevelopment) {
                 try {
                   await db.updateResearchTaskByDeepResearchId(taskId, {
@@ -439,7 +412,6 @@ export async function POST(req: Request) {
           }
 
           if (!completed) {
-            // Task is still running - send continue polling message
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({
@@ -465,22 +437,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Increment rate limit after successful validation
-    let anonymousCookieValue: string | undefined;
-    if (isUserInitiated && !isDevelopment) {
-      try {
-        const cookieHeader = req.headers.get('cookie') || '';
-        const rateLimitResult = await incrementRateLimit(user?.id, cookieHeader);
-
-        // Store cookie value for anonymous users to set in response
-        if (!user && rateLimitResult.cookieValue) {
-          anonymousCookieValue = rateLimitResult.cookieValue;
-        }
-      } catch (error) {
-        // Fail silently
-      }
-    }
-
     const headers = new Headers({
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
@@ -488,17 +444,8 @@ export async function POST(req: Request) {
       'X-Accel-Buffering': 'no',
     });
 
-    // Set anonymous rate limit cookie
-    if (anonymousCookieValue) {
-      const expires = new Date();
-      expires.setTime(expires.getTime() + 365 * 10 * 24 * 60 * 60 * 1000); // 10 years
-      headers.set('Set-Cookie', `$dekcuf_teg=${anonymousCookieValue}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`);
-    }
-
     if (isDevelopment) {
       headers.set("X-Development-Mode", "true");
-      headers.set("X-RateLimit-Limit", "unlimited");
-      headers.set("X-RateLimit-Remaining", "unlimited");
     }
 
     return new Response(stream, { headers });
