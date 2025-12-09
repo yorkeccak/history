@@ -83,7 +83,7 @@ export const useAuthStore = create<AuthStore>()(
       signInWithValyu: async () => {
         try {
           const redirectUri = getRedirectUri();
-          const { url } = await buildAuthorizationUrl(redirectUri);
+          const { url } = await buildAuthorizationUrl(redirectUri, window.location.host);
 
           // Redirect to Valyu OAuth
           window.location.href = url;

@@ -155,8 +155,10 @@ export function hasValidValyuTokens(): boolean {
 
 /**
  * Build the OAuth authorization URL with PKCE
+ * @param redirectUri - The callback URL after OAuth completes
+ * @param appSource - Optional identifier for the source app (e.g., 'history.valyu.ai')
  */
-export async function buildAuthorizationUrl(redirectUri: string): Promise<{
+export async function buildAuthorizationUrl(redirectUri: string, appSource?: string): Promise<{
   url: string;
   state: string;
   verifier: string;
@@ -181,6 +183,11 @@ export async function buildAuthorizationUrl(redirectUri: string): Promise<{
     access_type: 'offline',
     prompt: 'consent',
   });
+
+  // Add UTM source for tracking which app the user came from
+  if (appSource) {
+    params.set('utm_source', appSource);
+  }
 
   const url = `${OAUTH_ENDPOINTS.authorization}?${params.toString()}`;
 
