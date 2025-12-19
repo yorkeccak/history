@@ -8,6 +8,7 @@ import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { logEnvironmentStatus } from "@/lib/env-validation";
+import { MigrationBanner } from "@/components/migration-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -92,6 +93,7 @@ export default function RootLayout({
             <AuthInitializer>
               <PostHogProvider>
                 <MissingKeysDialog />
+                <MigrationBanner />
                 {children}
                 <Analytics />
               </PostHogProvider>
