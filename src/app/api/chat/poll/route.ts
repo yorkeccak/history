@@ -2,7 +2,7 @@
 // This endpoint can be called repeatedly from the client to check task status
 
 import * as db from '@/lib/db';
-import { isDevelopmentMode } from '@/lib/local-db/local-auth';
+import { isSelfHostedMode } from '@/lib/local-db/local-auth';
 
 const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
 const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
@@ -23,7 +23,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const isDevelopment = isDevelopmentMode();
+    const isSelfHosted = isSelfHostedMode();
 
     // Get Valyu access token from Authorization header if present
     const authHeader = req.headers.get('Authorization');
@@ -31,11 +31,11 @@ export async function GET(req: Request) {
       ? authHeader.slice(7)
       : null;
 
-    console.log('[Poll] taskId:', taskId, 'hasToken:', !!valyuAccessToken, 'isDev:', isDevelopment);
+    console.log('[Poll] taskId:', taskId, 'hasToken:', !!valyuAccessToken, 'isSelfHosted:', isSelfHosted);
 
     let statusResponse: Response;
 
-    // Use OAuth proxy if we have a token, otherwise fall back to API key (dev mode)
+    // Use OAuth proxy if we have a token, otherwise fall back to API key (self-hosted mode)
     if (valyuAccessToken) {
       console.log('[Poll] Using OAuth proxy');
       statusResponse = await fetch(VALYU_OAUTH_PROXY_URL, {
@@ -49,9 +49,9 @@ export async function GET(req: Request) {
           method: 'GET',
         }),
       });
-    } else if (isDevelopment && VALYU_API_KEY) {
-      // Dev mode fallback with API key
-      console.log('[Poll] Using dev API key');
+    } else if (isSelfHosted && VALYU_API_KEY) {
+      // Self-hosted mode fallback with API key
+      console.log('[Poll] Using self-hosted API key');
       statusResponse = await fetch(
         `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
         {
@@ -80,7 +80,7 @@ export async function GET(req: Request) {
     console.log('[Poll] Status data:', statusData.status, 'hasOutput:', !!statusData.output);
 
     // Update database status based on DeepResearch API status
-    if (!isDevelopment) {
+    if (!isSelfHosted) {
       try {
         if (statusData.status === 'running') {
           await db.updateResearchTaskByDeepResearchId(taskId, {

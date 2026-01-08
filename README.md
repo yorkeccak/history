@@ -63,13 +63,9 @@ The databases exist. The archives are digitized. The APIs are built. Someone jus
 - **Multiple Map Styles** - Satellite, streets, outdoors, and more
 
 ### Save & Share
-- **Research History** - Save and revisit your discoveries (signed-in users)
+- **Research History** - Save and revisit your discoveries
 - **Shareable Links** - Generate public links to research
 - **Mobile responsive** - Works on phone/tablet/desktop
-
-### Works Anonymously
-- **1 free query** - No signup required to try it
-- **Sign up for more** - 3 free queries per day, or upgrade for unlimited
 
 ## Technology Stack
 
@@ -83,9 +79,8 @@ The databases exist. The archives are digitized. The APIs are built. Someone jus
 - **[React Markdown](https://github.com/remarkjs/react-markdown)** - Rendering research reports
 
 ### Backend
-- **[Supabase](https://supabase.com)** - Authentication and database (production mode)
-- **[SQLite](https://www.sqlite.org/)** - Local database (development mode)
-- **[Polar](https://polar.sh)** - Subscription billing
+- **[Supabase](https://supabase.com)** - Authentication and database (valyu mode)
+- **[SQLite](https://www.sqlite.org/)** - Local database (self-hosted mode)
 - **[Drizzle ORM](https://orm.drizzle.team/)** - Type-safe database queries
 
 ### Infrastructure
@@ -94,20 +89,16 @@ The databases exist. The archives are digitized. The APIs are built. Someone jus
 
 Fully open-source. Self-hostable. Model-agnostic.
 
-## Quick Start
+## Quick Start (Self-Hosted)
+
+Self-hosted mode is the recommended way to run History locally. It requires only 2 API keys and takes about 5 minutes to set up.
 
 ### Prerequisites
 
-**For Development Mode (Easiest - No Auth Required):**
 - Node.js 18+
 - pnpm, npm, or yarn
 - Valyu DeepResearch API key ([get one free at platform.valyu.ai](https://platform.valyu.ai))
 - Mapbox access token ([get one free at mapbox.com](https://account.mapbox.com))
-
-**For Production Mode:**
-- All of the above, plus:
-- Supabase account and project
-- Polar account for billing (optional)
 
 ### Installation
 
@@ -128,10 +119,9 @@ Fully open-source. Self-hostable. Model-agnostic.
 
    Create a `.env.local` file in the root directory:
 
-   **For Development Mode (Recommended for getting started):**
    ```env
-   # Development Mode - No Auth, No Billing, No Database Setup Required
-   NEXT_PUBLIC_APP_MODE=development
+   # Self-Hosted Mode - No Auth Required
+   NEXT_PUBLIC_APP_MODE=self-hosted
 
    # Valyu API (Required)
    VALYU_API_KEY=valyu_your_api_key_here
@@ -141,30 +131,6 @@ Fully open-source. Self-hostable. Model-agnostic.
 
    # App URL
    NEXT_PUBLIC_APP_URL=http://localhost:3000
-   ```
-
-   **For Production Mode:**
-   ```env
-   # Production Mode
-   NEXT_PUBLIC_APP_MODE=production
-   NEXT_PUBLIC_APP_URL=https://yourdomain.com
-
-   # Valyu API
-   VALYU_API_KEY=valyu_your_api_key_here
-
-   # Mapbox
-   NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_mapbox_access_token_here
-
-   # Supabase
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key_here
-   SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
-
-   # Polar Billing (Optional)
-   POLAR_ACCESS_TOKEN=polar_your_access_token_here
-   POLAR_WEBHOOK_SECRET=whsec_your_webhook_secret_here
-   POLAR_SUBSCRIPTION_PRODUCT_ID=prod_your_subscription_product_id_here
-   POLAR_PAY_PER_USE_PRODUCT_ID=prod_your_pay_per_use_product_id_here
    ```
 
 4. **Run the development server**
@@ -208,69 +174,45 @@ Fully open-source. Self-hostable. Model-agnostic.
    - Click on source citations to verify information
    - View images and visual aids (if available)
 
-5. **Save for Later** (signed-in users)
-   - Your research is automatically saved
+5. **Save for Later**
+   - Your research is automatically saved locally
    - Access past research from the sidebar
-   - Share research via shareable URLs
 
 ### Advanced Features
 
 - **Random Discovery**: Click "Random Location" to explore a random place on Earth
-- **Map Styles**: Switch between satellite, streets, and other map styles (signed-in users)
+- **Map Styles**: Switch between satellite, streets, and other map styles
 - **Reasoning View**: Click to see the detailed reasoning trace of the AI
 - **Dark Mode**: Automatically matches your system preferences
 
-## Development Modes
+## App Modes
 
-History has two operating modes to make development easy:
+History has two operating modes:
 
-### Development Mode (Default for Local Development)
+### Self-Hosted Mode (Recommended)
 ```env
-NEXT_PUBLIC_APP_MODE=development
+NEXT_PUBLIC_APP_MODE=self-hosted
 ```
 
 **Features:**
 - No Supabase required - uses local SQLite
 - No authentication needed - auto-login as dev user
 - Unlimited queries - no rate limits
-- No billing integration
+- Uses your Valyu API key directly
 - Works completely offline (except API calls)
-- Perfect for contributing and testing
+- Perfect for local usage and contributing
 
-### Production Mode
+### Valyu Mode
 ```env
-NEXT_PUBLIC_APP_MODE=production
+NEXT_PUBLIC_APP_MODE=valyu
 ```
 
+**Note:** Valyu OAuth apps will be in general availability soon. Currently client id/secret are not publicly available. Contact contact@valyu.ai if you need access.
+
 **Features:**
-- Full authentication with Supabase
-- Billing integration with Polar
-- Rate limiting based on user tiers
-- Cloud database storage
-- Analytics and tracking
-
-## Rate Limits & Billing
-
-### Anonymous Users
-- **1 query (lifetime)** - No account required
-- After first query, prompted to sign up
-
-### Free Users (Signed Up)
-- **3 queries per day** - Resets at midnight
-- Full access to research history
-- Save and share research
-
-### Subscription Plan
-- Monthly recurring with queries included
-- Free trial period
-- Priority support
-- Resets on the 1st of each month
-
-### Pay-Per-Use Plan
-- Unlimited usage
-- No monthly commitment
-- Only pay for what you use
-- Billed via Polar usage metering
+- Full authentication with Valyu OAuth
+- Cloud database storage with Supabase
+- Used for the hosted version at history.valyu.ai
 
 ## Getting API Keys
 
@@ -285,7 +227,7 @@ NEXT_PUBLIC_APP_MODE=production
 **Pricing:**
 - Free tier available for testing
 - Pay-as-you-go pricing for production
-- Lite model: approximately $0.10 per research
+- Fast model: approximately $0.10 per research
 - Heavy model: approximately $0.50 per research
 
 ### Mapbox Access Token (Required)
@@ -298,19 +240,6 @@ NEXT_PUBLIC_APP_MODE=production
 **Pricing:**
 - 50,000 free map loads per month
 - Additional usage billed per load (very affordable)
-
-### Polar Setup (Optional - For Billing)
-
-1. Go to [polar.sh](https://polar.sh)
-2. Create an account
-3. Set up two products:
-   - **Subscription Product**: Monthly recurring with free trial
-   - **Pay-Per-Use Product**: Usage-based billing
-4. Create a meter for pay-per-use:
-   - Event name: `deep_research`
-   - Aggregation: `count`
-   - Set your desired pricing per unit
-5. Add product IDs and webhook secret to `.env.local`
 
 ## Database Schema
 
@@ -372,7 +301,7 @@ History is fully open-source. Contributions are welcome and appreciated.
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes
-4. Test in development mode (`NEXT_PUBLIC_APP_MODE=development`)
+4. Test in self-hosted mode (`NEXT_PUBLIC_APP_MODE=self-hosted`)
 5. Commit your changes (`git commit -m 'Add amazing feature'`)
 6. Push to the branch (`git push origin feature/amazing-feature`)
 7. Open a Pull Request
@@ -439,8 +368,6 @@ This project was born from countless hours spent exploring Google Maps, clicking
 - **[Valyu](https://valyu.ai)** - For building an incredible DeepResearch API that makes this possible
 - **[Mapbox](https://mapbox.com)** - For beautiful, performant globe visualization
 - **[Supabase](https://supabase.com)** - For making authentication and databases simple
-- **[Polar](https://polar.sh)** - For developer-friendly billing
-- **The Geography Community** - For inspiring curiosity about our planet
 
 ---
 

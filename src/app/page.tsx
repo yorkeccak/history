@@ -37,7 +37,7 @@ function HomeContent() {
 
   // Check if user is signed in with Valyu
   const isSignedIn = !!user && !!valyuAccessToken;
-  const isDevelopment = process.env.NEXT_PUBLIC_APP_MODE === 'development';
+  const isSelfHosted = process.env.NEXT_PUBLIC_APP_MODE === 'self-hosted';
 
   // Handle URL messages from auth callbacks
   useEffect(() => {
@@ -86,8 +86,8 @@ function HomeContent() {
       return;
     }
 
-    // Require Valyu sign-in (except in development mode)
-    if (!isDevelopment && !isSignedIn) {
+    // Require Valyu sign-in (except in self-hosted mode)
+    if (!isSelfHosted && !isSignedIn) {
       setShowAuthModal(true);
       return;
     }
@@ -95,12 +95,12 @@ function HomeContent() {
     // Show confirmation dialog
     setConfirmLocation(location);
     setShowConfirmDialog(true);
-  }, [isSignedIn, isDevelopment]);
+  }, [isSignedIn, isSelfHosted]);
 
   const handleConfirmResearch = useCallback((instructions?: string) => {
     if (confirmLocation) {
       // Double-check sign-in before starting research
-      if (!isDevelopment && !isSignedIn) {
+      if (!isSelfHosted && !isSignedIn) {
         setShowConfirmDialog(false);
         setShowAuthModal(true);
         return;
@@ -111,7 +111,7 @@ function HomeContent() {
       setShowConfirmDialog(false);
       setConfirmLocation(null);
     }
-  }, [confirmLocation, isSignedIn, isDevelopment]);
+  }, [confirmLocation, isSignedIn, isSelfHosted]);
 
   const handleCancelResearch = useCallback(() => {
     setShowConfirmDialog(false);
@@ -182,8 +182,8 @@ function HomeContent() {
   }, []);
 
   const handleFeelingLucky = useCallback(() => {
-    // Require Valyu sign-in (except in development mode)
-    if (!isDevelopment && !isSignedIn) {
+    // Require Valyu sign-in (except in self-hosted mode)
+    if (!isSelfHosted && !isSignedIn) {
       setShowAuthModal(true);
       return;
     }
@@ -191,7 +191,7 @@ function HomeContent() {
     if (globeRef.current) {
       globeRef.current.selectRandomLocation();
     }
-  }, [isSignedIn, isDevelopment]);
+  }, [isSignedIn, isSelfHosted]);
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">

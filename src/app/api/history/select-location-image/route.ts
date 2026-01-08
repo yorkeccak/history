@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateObject } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
-import { isDevelopmentMode } from '@/lib/local-db/local-auth';
+import { isSelfHostedMode } from '@/lib/local-db/local-auth';
 
 const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
 const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   try {
     const { locationName, valyuAccessToken } = await req.json();
 
-    const isDevelopment = isDevelopmentMode();
+    const isSelfHosted = isSelfHostedMode();
 
     // Check OpenAI API key
     const openaiApiKey = process.env.OPENAI_API_KEY;
@@ -106,8 +106,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ images: [], source: 'none', reason: 'OpenAI API key not configured' });
     }
 
-    // Require auth in production
-    if (!isDevelopment && !valyuAccessToken) {
+    // Require auth in valyu mode
+    if (!isSelfHosted && !valyuAccessToken) {
       return NextResponse.json({ images: [], source: 'none', reason: 'Authentication required' });
     }
 
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
       if (valyuAccessToken) {
         searchResponse = await searchValyuViaProxy(searchQuery, valyuAccessToken);
-      } else if (isDevelopment && VALYU_API_KEY) {
+      } else if (isSelfHosted && VALYU_API_KEY) {
         searchResponse = await searchValyuDirect(searchQuery);
       } else {
         return NextResponse.json({ images: [], source: 'none', reason: 'No Valyu credentials available' });
