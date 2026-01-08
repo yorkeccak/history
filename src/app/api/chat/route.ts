@@ -1,5 +1,5 @@
 import * as db from '@/lib/db';
-import { isDevelopmentMode } from '@/lib/local-db/local-auth';
+import { isSelfHostedMode } from '@/lib/local-db/local-auth';
 import { saveChatMessages } from '@/lib/db';
 
 // Vercel Pro plan allows up to 800s (13.3 minutes)
@@ -9,7 +9,7 @@ export const maxDuration = 800;
 const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
 const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
 
-// Fallback for development mode only
+// Fallback for self-hosted mode only
 const VALYU_API_KEY = process.env.VALYU_API_KEY;
 const DEEPRESEARCH_API_URL = 'https://api.valyu.ai/v1/deepresearch';
 
@@ -42,7 +42,7 @@ async function callDeepResearchApi(
 }
 
 /**
- * Fallback for development mode - direct API call
+ * Fallback for self-hosted mode - direct API call
  */
 async function callDeepResearchApiDev(body: any): Promise<Response> {
   const response = await fetch(`${DEEPRESEARCH_API_URL}/tasks`, {
@@ -97,10 +97,10 @@ export async function POST(req: Request) {
     } = await req.json();
 
     const lastMessage = messages[messages.length - 1];
-    const isDevelopment = isDevelopmentMode();
+    const isSelfHosted = isSelfHostedMode();
 
-    // REQUIRE Valyu sign-in for all queries (except dev mode)
-    if (!isDevelopment && !valyuAccessToken) {
+    // REQUIRE Valyu sign-in for all queries (except self-hosted mode)
+    if (!isSelfHosted && !valyuAccessToken) {
       return new Response(
         JSON.stringify({
           error: "AUTH_REQUIRED",
@@ -156,7 +156,7 @@ export async function POST(req: Request) {
     }
 
     // Create DeepResearch task - always use 'fast' model (credits managed by Valyu)
-    const taskResponse = isDevelopment && !valyuAccessToken
+    const taskResponse = isSelfHosted && !valyuAccessToken
       ? await callDeepResearchApiDev({
           input: researchQuery,
           model: 'fast',
@@ -190,7 +190,7 @@ export async function POST(req: Request) {
     const taskId = taskData.deepsearch_id || taskData.deepresearch_id;
 
     // Save research task to database
-    if (!isDevelopment && user) {
+    if (!isSelfHosted && user) {
       try {
         const taskRecord = {
           id: crypto.randomUUID(),
@@ -279,7 +279,7 @@ export async function POST(req: Request) {
             const statusData = await statusResponse.json();
 
             if (statusData.status === 'running') {
-              if (!isDevelopment && !hasSetRunning) {
+              if (!isSelfHosted && !hasSetRunning) {
                 hasSetRunning = true;
                 try {
                   await db.updateResearchTaskByDeepResearchId(taskId, {
@@ -377,7 +377,7 @@ export async function POST(req: Request) {
                 });
               }
 
-              if (!isDevelopment) {
+              if (!isSelfHosted) {
                 try {
                   await db.updateResearchTaskByDeepResearchId(taskId, {
                     status: 'completed',
@@ -396,7 +396,7 @@ export async function POST(req: Request) {
                 )
               );
             } else if (statusData.status === 'failed') {
-              if (!isDevelopment) {
+              if (!isSelfHosted) {
                 try {
                   await db.updateResearchTaskByDeepResearchId(taskId, {
                     status: 'failed',
@@ -444,7 +444,7 @@ export async function POST(req: Request) {
       'X-Accel-Buffering': 'no',
     });
 
-    if (isDevelopment) {
+    if (isSelfHosted) {
       headers.set("X-Development-Mode", "true");
     }
 

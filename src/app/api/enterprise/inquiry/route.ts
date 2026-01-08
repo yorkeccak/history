@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { EnterpriseInquiryEmail } from '@/lib/email-templates/enterprise-inquiry';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialize Resend to avoid build-time errors when API key is not set
+const getResend = () => new Resend(process.env.RESEND_API_KEY);
 
 const ENTERPRISE_RECIPIENTS = [
   'harvey@valyu.ai',
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Send email to Valyu team
-    await resend.emails.send({
+    await getResend().emails.send({
       from: 'History Enterprise <support@valyu.ai>',
       to: ENTERPRISE_RECIPIENTS,
       replyTo: contactEmail,

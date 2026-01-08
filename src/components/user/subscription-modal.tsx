@@ -151,7 +151,7 @@ export function SubscriptionModal({ open, onClose }: SubscriptionModalProps) {
             </div>
 
             {/* Enterprise Option */}
-            {process.env.NEXT_PUBLIC_APP_MODE !== 'development' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
+            {process.env.NEXT_PUBLIC_APP_MODE !== 'self-hosted' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
               <motion.div
                 className="relative group cursor-pointer"
                 whileHover={{ y: -2 }}

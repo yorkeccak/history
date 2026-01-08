@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import puppeteer from 'puppeteer';
 import { remark } from 'remark';
 import html from 'remark-html';
-import { isDevelopmentMode } from '@/lib/local-db/local-auth';
+import { isSelfHostedMode } from '@/lib/local-db/local-auth';
 
 const VALYU_APP_URL = process.env.VALYU_APP_URL || 'https://platform.valyu.ai';
 const VALYU_OAUTH_PROXY_URL = `${VALYU_APP_URL}/api/oauth/proxy`;
@@ -204,10 +204,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isDevelopment = isDevelopmentMode();
+    const isSelfHosted = isSelfHostedMode();
 
-    // Require auth token in production
-    if (!isDevelopment && !valyuAccessToken) {
+    // Require auth token in valyu mode
+    if (!isSelfHosted && !valyuAccessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -216,7 +216,7 @@ export async function POST(request: NextRequest) {
 
     let response: Response;
 
-    // Fetch research data via OAuth proxy or direct API (dev mode)
+    // Fetch research data via OAuth proxy or direct API (self-hosted mode)
     if (valyuAccessToken) {
       response = await fetch(VALYU_OAUTH_PROXY_URL, {
         method: 'POST',
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
           method: 'GET',
         }),
       });
-    } else if (isDevelopment && VALYU_API_KEY) {
+    } else if (isSelfHosted && VALYU_API_KEY) {
       response = await fetch(
         `${DEEPRESEARCH_API_URL}/tasks/${taskId}/status`,
         {

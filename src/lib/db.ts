@@ -1,11 +1,11 @@
 /**
- * Unified database interface that switches between Supabase (production)
- * and SQLite (development) based on NEXT_PUBLIC_APP_MODE
+ * Unified database interface that switches between Supabase (valyu mode)
+ * and SQLite (self-hosted mode) based on NEXT_PUBLIC_APP_MODE
  */
 
 import { createClient as createSupabaseClient } from "@/utils/supabase/server";
 import { getLocalDb, DEV_USER_ID } from "./local-db/client";
-import { getDevUser, isDevelopmentMode } from "./local-db/local-auth";
+import { getDevUser, isSelfHostedMode } from "./local-db/local-auth";
 import { eq, desc, and } from "drizzle-orm";
 import * as schema from "./local-db/schema";
 
@@ -14,7 +14,7 @@ import * as schema from "./local-db/schema";
 // ============================================================================
 
 export async function getUser() {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     return { data: { user: getDevUser() }, error: null };
   }
 
@@ -23,7 +23,7 @@ export async function getUser() {
 }
 
 export async function getSession() {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     return {
       data: {
         session: {
@@ -44,7 +44,7 @@ export async function getSession() {
 // ============================================================================
 
 export async function getUserProfile(userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const user = await db.query.users.findFirst({
       where: eq(schema.users.id, userId),
@@ -66,7 +66,7 @@ export async function getUserProfile(userId: string) {
 // ============================================================================
 
 export async function getUserRateLimit(userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const rateLimit = await db.query.userRateLimits.findFirst({
       where: eq(schema.userRateLimits.userId, userId),
@@ -87,7 +87,7 @@ export async function updateUserRateLimit(
   userId: string,
   updates: { usage_count?: number; reset_date?: string; last_request_at?: Date }
 ) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db
       .update(schema.userRateLimits)
@@ -113,7 +113,7 @@ export async function updateUserRateLimit(
 // ============================================================================
 
 export async function getChatSessions(userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const sessions = await db.query.chatSessions.findMany({
       where: eq(schema.chatSessions.userId, userId),
@@ -132,7 +132,7 @@ export async function getChatSessions(userId: string) {
 }
 
 export async function getChatSession(sessionId: string, userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const session = await db.query.chatSessions.findFirst({
       where: and(
@@ -158,7 +158,7 @@ export async function createChatSession(session: {
   user_id: string;
   title: string;
 }) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db.insert(schema.chatSessions).values({
       id: session.id,
@@ -178,7 +178,7 @@ export async function updateChatSession(
   userId: string,
   updates: { title?: string; last_message_at?: Date }
 ) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const updateData: any = {
       updatedAt: new Date(),
@@ -209,7 +209,7 @@ export async function updateChatSession(
 }
 
 export async function deleteChatSession(sessionId: string, userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db
       .delete(schema.chatSessions)
@@ -236,7 +236,7 @@ export async function deleteChatSession(sessionId: string, userId: string) {
 // ============================================================================
 
 export async function getChatMessages(sessionId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const messages = await db.query.chatMessages.findMany({
       where: eq(schema.chatMessages.sessionId, sessionId),
@@ -264,7 +264,7 @@ export async function saveChatMessages(
   }>
 ) {
 
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
 
     // Delete existing messages
@@ -315,7 +315,7 @@ export async function saveChatMessages(
 }
 
 export async function deleteChatMessages(sessionId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db
       .delete(schema.chatMessages)
@@ -336,7 +336,7 @@ export async function deleteChatMessages(sessionId: string) {
 // ============================================================================
 
 export async function getChart(chartId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const chart = await db.query.charts.findFirst({
       where: eq(schema.charts.id, chartId),
@@ -360,7 +360,7 @@ export async function createChart(chart: {
   session_id: string;
   chart_data: any;
 }) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db.insert(schema.charts).values({
       id: chart.id,
@@ -382,7 +382,7 @@ export async function createChart(chart: {
 // ============================================================================
 
 export async function getCSV(csvId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const csv = await db.query.csvs.findFirst({
       where: eq(schema.csvs.id, csvId),
@@ -409,7 +409,7 @@ export async function createCSV(csv: {
   headers: string[];
   rows: any[][];
 }) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db.insert(schema.csvs).values({
       id: csv.id,
@@ -434,7 +434,7 @@ export async function createCSV(csv: {
 // ============================================================================
 
 export async function getResearchTasks(userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const tasks = await db.query.researchTasks.findMany({
       where: eq(schema.researchTasks.userId, userId),
@@ -455,7 +455,7 @@ export async function getResearchTasks(userId: string) {
 }
 
 export async function getResearchTask(taskId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const task = await db.query.researchTasks.findFirst({
       where: eq(schema.researchTasks.id, taskId),
@@ -482,7 +482,7 @@ export async function createResearchTask(task: {
   status?: string;
   anonymous_id?: string;
 }) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db.insert(schema.researchTasks).values({
       id: task.id,
@@ -510,7 +510,7 @@ export async function updateResearchTask(
     location_images?: string;
   }
 ) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const updateData: any = {
       updatedAt: new Date(),
@@ -543,7 +543,7 @@ export async function updateResearchTaskByDeepResearchId(
     completed_at?: Date | null;
   }
 ) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const updateData: any = {
       updatedAt: new Date(),
@@ -578,7 +578,7 @@ function createLocationSlug(locationName: string): string {
 
 // Share a research task publicly
 export async function shareResearchTask(taskId: string, userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
 
     // Get the task to access location_name
@@ -641,7 +641,7 @@ export async function shareResearchTask(taskId: string, userId: string) {
 
 // Unshare a research task
 export async function unshareResearchTask(taskId: string, userId: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     await db.update(schema.researchTasks)
       .set({
@@ -669,7 +669,7 @@ export async function unshareResearchTask(taskId: string, userId: string) {
 
 // Get a public research task by share token (no auth required)
 export async function getPublicResearchTask(shareToken: string) {
-  if (isDevelopmentMode()) {
+  if (isSelfHostedMode()) {
     const db = getLocalDb();
     const [task] = await db.select()
       .from(schema.researchTasks)

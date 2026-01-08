@@ -62,7 +62,7 @@ export function Sidebar({
   const router = useRouter();
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const isDevelopment = process.env.NEXT_PUBLIC_APP_MODE === 'development';
+  const isSelfHosted = process.env.NEXT_PUBLIC_APP_MODE === 'self-hosted';
 
   // Keep dock open by default for everyone
   const [isOpen, setIsOpen] = useState(true);
@@ -78,7 +78,7 @@ export function Sidebar({
   const { data: tasks = [], isLoading: loadingTasks } = useQuery({
     queryKey: ['research-tasks'],
     queryFn: async () => {
-      if (isDevelopment) {
+      if (isSelfHosted) {
         const response = await fetch('/api/research/tasks');
         const { tasks } = await response.json();
         return tasks;
@@ -94,7 +94,7 @@ export function Sidebar({
       const { tasks } = await response.json();
       return tasks;
     },
-    enabled: isDevelopment || !!user,
+    enabled: isSelfHosted || !!user,
     refetchInterval: 5000, // Refresh every 5 seconds to update status badges
   });
 
@@ -273,7 +273,7 @@ export function Sidebar({
               <div className="w-10 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
               {/* New Research */}
-              {(user || isDevelopment) && (
+              {(user || isSelfHosted) && (
                 <div className="relative group/tooltip">
                   <button
                     onClick={handleNewResearch}
@@ -291,14 +291,14 @@ export function Sidebar({
               <div className="relative group/tooltip">
                 <button
                   onClick={() => {
-                    if (!user && !isDevelopment) {
+                    if (!user && !isSelfHosted) {
                       window.dispatchEvent(new CustomEvent('show-auth-modal'));
                     } else {
                       setShowHistory(!showHistory);
                     }
                   }}
                   className={`w-12 h-12 flex items-center justify-center rounded-[20px] transition-all duration-200 hover:scale-110 active:scale-95 ${
-                    !user && !isDevelopment
+                    !user && !isSelfHosted
                       ? 'opacity-50 cursor-not-allowed hover:bg-accent'
                       : showHistory
                         ? 'bg-primary text-primary-foreground shadow-lg'
@@ -306,7 +306,7 @@ export function Sidebar({
                   }`}
                 >
                   <History className={`h-6 w-6 transition-colors ${
-                    !user && !isDevelopment
+                    !user && !isSelfHosted
                       ? 'text-muted-foreground/50'
                       : showHistory
                         ? 'text-primary-foreground'
@@ -314,15 +314,15 @@ export function Sidebar({
                   }`} />
                 </button>
                 <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-popover text-popover-foreground text-sm font-medium rounded-lg opacity-0 group-hover/tooltip:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50 border border-border shadow-md">
-                  {!user && !isDevelopment ? 'Sign up (free) for history' : 'Research History'}
+                  {!user && !isSelfHosted ? 'Sign up (free) for history' : 'Research History'}
                 </div>
               </div>
 
               {/* Divider */}
-              {user && !isDevelopment && <div className="w-10 h-px bg-gradient-to-r from-transparent via-border to-transparent my-1" />}
+              {user && !isSelfHosted && <div className="w-10 h-px bg-gradient-to-r from-transparent via-border to-transparent my-1" />}
 
-              {/* Valyu Credits - Hidden in development mode */}
-              {user && !isDevelopment && (
+              {/* Valyu Credits - Hidden in self-hosted mode */}
+              {user && !isSelfHosted && (
                 <div className="relative group/tooltip">
                   <button
                     onClick={handleManageCredits}
@@ -337,7 +337,7 @@ export function Sidebar({
               )}
 
               {/* Enterprise */}
-              {user && process.env.NEXT_PUBLIC_APP_MODE !== 'development' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
+              {user && process.env.NEXT_PUBLIC_APP_MODE !== 'self-hosted' && process.env.NEXT_PUBLIC_ENTERPRISE === 'true' && (
                 <div className="relative group/tooltip">
                   <button
                     onClick={() => setShowEnterpriseModal(true)}
@@ -510,7 +510,7 @@ export function Sidebar({
 
       {/* Research History Panel - Hidden on mobile */}
       <AnimatePresence>
-        {showHistory && (user || isDevelopment) && (
+        {showHistory && (user || isSelfHosted) && (
           <>
             {/* Backdrop */}
             <motion.div
