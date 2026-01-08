@@ -28,13 +28,13 @@ export function validatePaymentEnvironment(): EnvValidationResult {
   if (isProduction) {
     // Valyu OAuth requirements
     if (!process.env.NEXT_PUBLIC_VALYU_SUPABASE_URL) {
-      errors.push('NEXT_PUBLIC_VALYU_SUPABASE_URL is required in production');
+      errors.push('NEXT_PUBLIC_VALYU_SUPABASE_URL is required in valyu mode');
     }
     if (!process.env.NEXT_PUBLIC_VALYU_CLIENT_ID) {
-      errors.push('NEXT_PUBLIC_VALYU_CLIENT_ID is required in production');
+      errors.push('NEXT_PUBLIC_VALYU_CLIENT_ID is required in valyu mode');
     }
     if (!process.env.VALYU_CLIENT_SECRET) {
-      errors.push('VALYU_CLIENT_SECRET is required in production');
+      errors.push('VALYU_CLIENT_SECRET is required in valyu mode');
     }
   }
 
