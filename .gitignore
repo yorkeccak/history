@@ -49,3 +49,6 @@ docs/
 
 # local development database
 .local-data/
+
+# claude code
+.claude/

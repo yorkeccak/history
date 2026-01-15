@@ -66,6 +66,7 @@ interface HistoryResearchInterfaceProps {
   initialTaskId?: string;
   customInstructions?: string;
   initialImages?: string[];
+  excludedSources?: string[];
 }
 
 const AnimatedDots = ({ isActive }: { isActive: boolean }) => {
@@ -247,7 +248,7 @@ const TimelineItem = ({ item, idx, timeline, animated = true }: { item: any; idx
   return null;
 };
 
-export function HistoryResearchInterface({ location, onClose, onTaskCreated, initialTaskId, customInstructions, initialImages }: HistoryResearchInterfaceProps) {
+export function HistoryResearchInterface({ location, onClose, onTaskCreated, initialTaskId, customInstructions, initialImages, excludedSources }: HistoryResearchInterfaceProps) {
   const { user, valyuAccessToken } = useAuthStore();
   const [status, setStatus] = useState<'idle' | 'queued' | 'running' | 'completed' | 'error'>('idle');
   const [showMiniGlobe, setShowMiniGlobe] = useState(true);
@@ -587,6 +588,7 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
             ],
             location,
             valyuAccessToken,
+            excludedSources,
           }),
         });
 

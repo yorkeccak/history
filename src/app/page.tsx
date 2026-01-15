@@ -29,6 +29,7 @@ function HomeContent() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [confirmLocation, setConfirmLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
   const [customInstructions, setCustomInstructions] = useState<string | undefined>(undefined);
+  const [excludedSources, setExcludedSources] = useState<string[] | undefined>(undefined);
   const [globeTheme, setGlobeTheme] = useState<GlobeTheme>('satellite-streets-v12');
   const globeRef = useRef<any>(null);
   const [showMobileSettings, setShowMobileSettings] = useState(false);
@@ -97,7 +98,7 @@ function HomeContent() {
     setShowConfirmDialog(true);
   }, [isSignedIn, isSelfHosted]);
 
-  const handleConfirmResearch = useCallback((instructions?: string) => {
+  const handleConfirmResearch = useCallback((instructions?: string, sources?: string[]) => {
     if (confirmLocation) {
       // Double-check sign-in before starting research
       if (!isSelfHosted && !isSignedIn) {
@@ -107,6 +108,7 @@ function HomeContent() {
       }
 
       setCustomInstructions(instructions);
+      setExcludedSources(sources);
       setSelectedLocation(confirmLocation);
       setShowConfirmDialog(false);
       setConfirmLocation(null);
@@ -305,6 +307,7 @@ function HomeContent() {
               }}
               initialTaskId={searchParams.get('research') || undefined}
               customInstructions={customInstructions}
+              excludedSources={excludedSources}
             />
           </motion.div>
         )}
