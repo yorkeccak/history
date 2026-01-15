@@ -6,10 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { X, ChevronDown, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/lib/stores/use-auth-store';
+import { Favicon } from '@/components/ui/favicon';
 
 interface ResearchConfirmationDialogProps {
   location: { name: string; lat: number; lng: number } | null;
-  onConfirm: (customInstructions?: string) => void;
+  onConfirm: (customInstructions?: string, excludedSources?: string[]) => void;
   onCancel: () => void;
   onSignUp?: () => void;
 }
@@ -82,15 +83,17 @@ export function ResearchConfirmationDialog({
   const [selectedPreset, setSelectedPreset] = useState<string>('general');
   const [customInstructions, setCustomInstructions] = useState('');
   const [showCustom, setShowCustom] = useState(false);
+  const [wikipediaDisabled, setWikipediaDisabled] = useState(false);
 
   if (!location) return null;
 
   const handleConfirm = () => {
+    const excludedSources = wikipediaDisabled ? ['wikipedia.org'] : undefined;
     if (customInstructions.trim()) {
-      onConfirm(customInstructions.trim());
+      onConfirm(customInstructions.trim(), excludedSources);
     } else {
       const preset = PRESETS.find(p => p.id === selectedPreset);
-      onConfirm(preset?.prompt);
+      onConfirm(preset?.prompt, excludedSources);
     }
   };
 
@@ -189,6 +192,26 @@ export function ResearchConfirmationDialog({
                   </motion.div>
                 )}
               </AnimatePresence>
+            </div>
+
+            {/* Source Exclusions */}
+            <div>
+              <label className="block text-[10px] sm:text-xs font-medium text-muted-foreground mb-1.5 sm:mb-2">
+                Exclude sources (optional)
+              </label>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                <button
+                  onClick={() => setWikipediaDisabled(!wikipediaDisabled)}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg transition-all border min-h-8 ${
+                    wikipediaDisabled
+                      ? 'bg-destructive/10 text-destructive border-destructive/30 line-through'
+                      : 'bg-card text-card-foreground border-border hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                >
+                  <Favicon url="https://wikipedia.org" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span>Wikipedia</span>
+                </button>
+              </div>
             </div>
           </div>
 

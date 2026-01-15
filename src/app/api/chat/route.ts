@@ -89,11 +89,12 @@ async function getTaskStatus(taskId: string, valyuAccessToken?: string): Promise
 
 export async function POST(req: Request) {
   try {
-    const { messages, sessionId, location, valyuAccessToken }: {
+    const { messages, sessionId, location, valyuAccessToken, excludedSources }: {
       messages: DeepResearchMessage[],
       sessionId?: string,
       location?: { name: string; lat: number; lng: number },
-      valyuAccessToken?: string
+      valyuAccessToken?: string,
+      excludedSources?: string[]
     } = await req.json();
 
     const lastMessage = messages[messages.length - 1];
@@ -155,17 +156,24 @@ export async function POST(req: Request) {
       researchQuery = `Provide a comprehensive historical overview of this location, covering major events, cultural significance, and key developments throughout history.\n\nLocation: ${location.name}`;
     }
 
+    // Build search params if excluded sources are specified
+    const searchParams = excludedSources && excludedSources.length > 0
+      ? { excluded_sources: excludedSources }
+      : undefined;
+
     // Create DeepResearch task - always use 'fast' model (credits managed by Valyu)
     const taskResponse = isSelfHosted && !valyuAccessToken
       ? await callDeepResearchApiDev({
           input: researchQuery,
           model: 'fast',
-          output_formats: ['markdown']
+          output_formats: ['markdown'],
+          ...(searchParams && { search: searchParams })
         })
       : await callDeepResearchApi({
           input: researchQuery,
           model: 'fast',
-          output_formats: ['markdown']
+          output_formats: ['markdown'],
+          ...(searchParams && { search: searchParams })
         }, valyuAccessToken!);
 
     if (!taskResponse.ok) {
