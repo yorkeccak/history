@@ -258,7 +258,7 @@ export function ResearchConfirmationDialog({
                   value={excludeUrlInput}
                   onChange={(e) => setExcludeUrlInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddExcludeUrl())}
-                  placeholder="e.g., reddit.com, quora.com"
+                  placeholder="Enter domain to exclude... e.g., reddit.com"
                   className="flex-1 px-2.5 py-1.5 text-[10px] sm:text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary min-h-8"
                 />
                 <Button
