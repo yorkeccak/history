@@ -82,7 +82,7 @@ export function ResearchConfirmationDialog({
   const { user } = useAuthStore();
   const [selectedPreset, setSelectedPreset] = useState<string>('general');
   const [customInstructions, setCustomInstructions] = useState('');
-  const [showCustom, setShowCustom] = useState(false);
+  const [showCustom, setShowCustom] = useState(true);
   const [wikipediaDisabled, setWikipediaDisabled] = useState(false);
 
   if (!location) return null;
@@ -167,7 +167,7 @@ export function ResearchConfirmationDialog({
                 onClick={() => setShowCustom(!showCustom)}
                 className="w-full flex items-center justify-between text-[10px] sm:text-xs font-medium text-muted-foreground hover:text-foreground transition-colors min-h-9"
               >
-                <span>Custom instructions</span>
+                <span>Custom instructions (optional)</span>
                 <ChevronDown className={`h-3 w-3 transition-transform flex-shrink-0 ${showCustom ? 'rotate-180' : ''}`} />
               </button>
 
