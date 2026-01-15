@@ -84,17 +84,46 @@ export function ResearchConfirmationDialog({
   const [customInstructions, setCustomInstructions] = useState('');
   const [showCustom, setShowCustom] = useState(true);
   const [wikipediaDisabled, setWikipediaDisabled] = useState(false);
+  const [customExcludedUrls, setCustomExcludedUrls] = useState<string[]>([]);
+  const [excludeUrlInput, setExcludeUrlInput] = useState('');
 
   if (!location) return null;
 
   const handleConfirm = () => {
-    const excludedSources = wikipediaDisabled ? ['wikipedia.org'] : undefined;
+    const allExcluded = [
+      ...(wikipediaDisabled ? ['wikipedia.org'] : []),
+      ...customExcludedUrls
+    ];
+    const excludedSources = allExcluded.length > 0 ? allExcluded : undefined;
     if (customInstructions.trim()) {
       onConfirm(customInstructions.trim(), excludedSources);
     } else {
       const preset = PRESETS.find(p => p.id === selectedPreset);
       onConfirm(preset?.prompt, excludedSources);
     }
+  };
+
+  const handleAddExcludeUrl = () => {
+    const url = excludeUrlInput.trim().toLowerCase();
+    if (url && !customExcludedUrls.includes(url)) {
+      // Extract domain from URL if full URL provided
+      let domain = url;
+      try {
+        if (url.includes('://')) {
+          domain = new URL(url).hostname;
+        } else if (url.includes('/')) {
+          domain = url.split('/')[0];
+        }
+      } catch {
+        // Keep as-is if parsing fails
+      }
+      setCustomExcludedUrls([...customExcludedUrls, domain]);
+      setExcludeUrlInput('');
+    }
+  };
+
+  const handleRemoveExcludeUrl = (url: string) => {
+    setCustomExcludedUrls(customExcludedUrls.filter(u => u !== url));
   };
 
   return (
@@ -199,7 +228,7 @@ export function ResearchConfirmationDialog({
               <label className="block text-[10px] sm:text-xs font-medium text-muted-foreground mb-1.5 sm:mb-2">
                 Exclude sources (optional)
               </label>
-              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+              <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-2">
                 <button
                   onClick={() => setWikipediaDisabled(!wikipediaDisabled)}
                   className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg transition-all border min-h-8 ${
@@ -211,6 +240,36 @@ export function ResearchConfirmationDialog({
                   <Favicon url="https://wikipedia.org" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span>Wikipedia</span>
                 </button>
+                {customExcludedUrls.map((url) => (
+                  <button
+                    key={url}
+                    onClick={() => handleRemoveExcludeUrl(url)}
+                    className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 text-[10px] sm:text-xs font-medium rounded-lg transition-all border min-h-8 bg-destructive/10 text-destructive border-destructive/30 line-through"
+                  >
+                    <Favicon url={`https://${url}`} className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <span>{url}</span>
+                    <X className="w-3 h-3 ml-0.5" />
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={excludeUrlInput}
+                  onChange={(e) => setExcludeUrlInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddExcludeUrl())}
+                  placeholder="Enter domain to exclude..."
+                  className="flex-1 px-2.5 py-1.5 text-[10px] sm:text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary min-h-8"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddExcludeUrl}
+                  className="min-h-8 px-2.5 text-[10px] sm:text-xs"
+                >
+                  Add
+                </Button>
               </div>
             </div>
           </div>
