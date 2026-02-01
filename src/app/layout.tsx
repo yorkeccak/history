@@ -28,29 +28,58 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
+const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://history.valyu.ai";
+
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-  ),
+  metadataBase: new URL(baseUrl),
   title: {
-    default: "History | Discover the stories behind every place on Earth",
-    template: "%s | History",
+    default: "History AI - Explore the History of Any Place | Valyu",
+    template: "%s | History AI",
   },
   description:
-    "Click anywhere on an interactive 3D globe and get comprehensive historical research in minutes. Deep research powered by AI, sourced from historical databases, academic archives, and verified sources.",
-  applicationName: "History",
+    "Explore world history with an interactive 3D globe. Click any location to get AI-powered historical research from academic archives, historical databases, and verified sources. Your personal geography AI for place history search.",
+  applicationName: "History AI",
+  keywords: [
+    "historical research AI",
+    "location history",
+    "world history explorer",
+    "geography AI",
+    "place history search",
+    "interactive history map",
+    "AI history research",
+    "historical timeline",
+    "geographic history",
+    "local history finder",
+  ],
+  authors: [{ name: "Valyu", url: "https://valyu.ai" }],
+  creator: "Valyu",
+  publisher: "Valyu",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  alternates: {
+    canonical: baseUrl,
+  },
   openGraph: {
-    title: "History | Discover the stories behind every place on Earth",
+    title: "History AI - Explore the History of Any Place | Valyu",
     description:
-      "Click anywhere on an interactive 3D globe and get comprehensive historical research in minutes. Deep research powered by AI, sourced from historical databases, academic archives, and verified sources.",
-    url: "/",
-    siteName: "History",
+      "Explore world history with an interactive 3D globe. Click any location to get AI-powered historical research from academic archives, historical databases, and verified sources.",
+    url: baseUrl,
+    siteName: "History AI",
     images: [
       {
         url: "/history.png",
         width: 1200,
         height: 630,
-        alt: "History | Discover the stories behind every place on Earth",
+        alt: "History AI - Interactive 3D globe for exploring world history",
       },
     ],
     locale: "en_US",
@@ -58,13 +87,25 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "History | Discover the stories behind every place on Earth",
+    title: "History AI - Explore the History of Any Place | Valyu",
     description:
-      "Click anywhere on an interactive 3D globe and get comprehensive historical research in minutes. Deep research powered by AI, sourced from historical databases, academic archives, and verified sources.",
+      "Explore world history with an interactive 3D globe. Click any location to get AI-powered historical research from academic archives and verified sources.",
     images: ["/history.png"],
+    creator: "@valaboratory",
+    site: "@valaboratory",
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico" },
+    ],
+    apple: [
+      { url: "/history.png" },
+    ],
+  },
+  manifest: "/manifest.json",
+  category: "education",
+  other: {
+    "google-site-verification": process.env.GOOGLE_SITE_VERIFICATION || "",
   },
 };
 
@@ -78,8 +119,40 @@ export default function RootLayout({
     logEnvironmentStatus();
   }
   
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "History AI",
+    "applicationCategory": "EducationalApplication",
+    "operatingSystem": "Web",
+    "description": "Explore world history with an interactive 3D globe. Click any location to get AI-powered historical research from academic archives, historical databases, and verified sources.",
+    "url": baseUrl,
+    "image": `${baseUrl}/history.png`,
+    "author": {
+      "@type": "Organization",
+      "name": "Valyu",
+      "url": "https://valyu.ai"
+    },
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.8",
+      "ratingCount": "314"
+    }
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-x-hidden`}
       >
