@@ -1,0 +1,22 @@
+{
+  "name": "History AI - Explore the History of Any Place",
+  "short_name": "History AI",
+  "description": "Interactive 3D globe for exploring world history. Click anywhere to get AI-powered historical research with verified sources.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "any",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/history.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
