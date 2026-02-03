@@ -599,16 +599,11 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
         });
 
         if (!response.ok) {
-          // Handle auth required errors
+          // Handle auth required errors - ALL 401s mean auth issues
           if (response.status === 401) {
-            const errorData = await response.json();
-            if (errorData.error === 'AUTH_REQUIRED') {
-              // Show auth modal
-              window.dispatchEvent(new CustomEvent('show-auth-modal'));
-              setStatus('idle');
-              onClose();
-              return;
-            }
+            const authError = new Error('Your session has expired. Please sign out and sign in again.');
+            (authError as any).isAuth = true;
+            throw authError;
           }
           // Handle credit errors
           if (response.status === 402) {
@@ -726,8 +721,12 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
           }
         }
       } catch (err) {
-        // Handle credit errors by showing a user-friendly message
-        if ((err as any).isCredit) {
+        // Handle auth errors by showing auth modal
+        if ((err as any).isAuth) {
+          window.dispatchEvent(new CustomEvent('show-auth-modal'));
+          setError(err instanceof Error ? err.message : 'Authentication required');
+        } else if ((err as any).isCredit) {
+          // Handle credit errors by showing a user-friendly message
           setError('Insufficient Valyu credits. Add credits at platform.valyu.ai');
         } else {
           setError(err instanceof Error ? err.message : 'Unknown error');
