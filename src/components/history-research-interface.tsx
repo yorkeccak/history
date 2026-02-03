@@ -413,6 +413,12 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
       }
       const response = await fetch(`/api/chat/poll?taskId=${taskId}`, { headers });
       if (!response.ok) {
+        // Handle authentication errors
+        if (response.status === 401) {
+          const authError = new Error('Your session has expired. Please sign in again.');
+          (authError as any).isAuth = true;
+          throw authError;
+        }
         throw new Error('Failed to poll task status');
       }
 
@@ -750,6 +756,10 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
             }
           }
         } catch (err) {
+          // Handle auth errors specially
+          if ((err as any).isAuth) {
+            window.dispatchEvent(new CustomEvent('show-auth-modal'));
+          }
           setError(err instanceof Error ? err.message : 'Polling error');
           setStatus('error');
           setShouldContinuePolling(false);
