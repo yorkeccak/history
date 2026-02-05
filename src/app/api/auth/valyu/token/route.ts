@@ -39,6 +39,7 @@ export async function POST(request: Request) {
 
     // Build token request - use OAuth 2.1 endpoint
     const tokenUrl = `${valyuSupabaseUrl}/auth/v1/oauth/token`;
+    const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     let tokenParams: Record<string, string>;
 
     if (grant_type === 'refresh_token' && refresh_token) {
@@ -46,8 +47,6 @@ export async function POST(request: Request) {
       tokenParams = {
         grant_type: 'refresh_token',
         refresh_token,
-        client_id: clientId,
-        client_secret: clientSecret,
       };
     } else if (code && code_verifier) {
       // Authorization code flow with PKCE
@@ -56,8 +55,6 @@ export async function POST(request: Request) {
         code,
         code_verifier,
         redirect_uri: redirect_uri || '',
-        client_id: clientId,
-        client_secret: clientSecret,
       };
     } else {
       return NextResponse.json(
@@ -73,6 +70,7 @@ export async function POST(request: Request) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${basicAuth}`,
       },
       body: new URLSearchParams(tokenParams),
     });
