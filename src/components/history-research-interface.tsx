@@ -1060,6 +1060,9 @@ export function HistoryResearchInterface({ location, onClose, onTaskCreated, ini
                         <p className="text-xs sm:text-sm font-light text-foreground/60">
                           Generating report...
                         </p>
+                        <p className="text-[10px] sm:text-xs font-light text-foreground/40 mt-1.5">
+                          Reports take roughly 5 minutes. Images and progress will stream in shortly.
+                        </p>
                       </div>
                     </div>
                   </div>
